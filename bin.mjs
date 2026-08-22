@@ -82,7 +82,13 @@ app.on('updated', () => console.log('[updater] update complete... applying'))
 app.on('update-applied', () =>
   console.log('[updater] applied update, restart to run latest version')
 )
-app.on('error', (err) => console.error('[app:error]', err))
+app.on('error', (err) => {
+  // El updater comparte un almacenamiento con lock entre instancias. Que no
+  // pueda tomarlo es esperable si ya hay otra ventana abierta, y se avisa
+  // más abajo con un mensaje entendible en vez de este volcado.
+  if (/could not be locked/i.test(err.message)) return
+  console.error('[app:error]', err.message)
+})
 
 let room = null
 
@@ -103,9 +109,16 @@ process.on('SIGINT', () => shutdown(130))
 process.on('SIGQUIT', () => shutdown(131))
 process.on('SIGTERM', () => shutdown(143))
 
+// Las actualizaciones son un extra, no un requisito para compartir archivos.
+// Si ya hay otra ventana de Chakai abierta en esta máquina, el updater no
+// puede tomar su lock — antes eso mataba la app entera. Ahora seguimos igual.
 try {
   await app.ready()
+} catch {
+  console.log('\nℹ  Actualizaciones desactivadas en esta ventana (ya hay otra abierta).')
+}
 
+try {
   if (action === null) {
     console.log(`\n🎵 Chakai v${pkg.version} — stems y partituras entre la banda, sin servidor\n`)
     console.log('  chakai share <sala> [archivos...]   compartir con la banda')
@@ -144,6 +157,8 @@ try {
     console.log('Sigo conectado para que otros puedan bajar de acá. Ctrl+C para cortar.\n')
   }
 } catch (err) {
-  console.error('[app:error]', err)
-  await app.close().finally(() => Bare.exit(1))
+  // Errores del usuario (código mal pegado, archivo inexistente): mensaje
+  // claro, sin volcado de pila.
+  console.error(`\n✖ ${err.message}\n`)
+  await shutdown(1)
 }
