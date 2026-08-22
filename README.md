@@ -1,154 +1,97 @@
-# hello-pear-bare
+# Chakai
 
-> Pear Hello World for Standalone Bare Processes with `pear-runtime` worker
+> Compartí stems y partituras con tu banda. Sin servidor, sin límite de tamaño, sin que el link venza a los 7 días.
 
-End-to-end boilerplate for embedding [pear-runtime] into the [Bare] worker of a [Bare] CLI with peer-to-peer OTA update support.
+Aleph Hackathon 2026 — chapter Salta · **Pears Track**
 
-This boilerplate uses the companion [`hello-pear-worker`][hello-pear-worker] as a reusable cross-platform local backend. Keeping networking, storage and updates in a separate worker lets mobile apps, desktop UIs and standalone Bare applications share the same backend implementation while each parent owns its platform-specific interface.
+## El problema
 
-- Peer-to-Peer deployment with [pear][pear-docs] CLI
-- Peer-to-Peer Over-the-Air updates with [`pear-runtime`][pear-runtime] module
-- Bare worker process via `PearRuntime.run(...)`
-- Cross-platform standalone distributables via [`bare-build`][bare-build]
+Una banda graba en estudios caseros distintos. Para pasarse las tomas:
 
-## Variants
+- **WhatsApp** comprime el audio y arruina el stem.
+- **WeTransfer** vence a los 7 días.
+- **Google Drive** se llena, y hay que pagar para que no se llene.
 
-- (current) [`main`](https://github.com/holepunchto/hello-pear-bare/tree/main): runs `pear-runtime` inside a Bare worker thread.
-- [`single-thread`](https://github.com/holepunchto/hello-pear-bare/tree/variant/single-thread): workerless with `pear-runtime` updates.
-- [`daemon`](https://github.com/holepunchto/hello-pear-bare/tree/variant/daemon): runs `pear-runtime` in a detached updater daemon.
+Todos esos caminos tienen algo en común: un servidor de una empresa en el medio, que cuesta plata y que decide cuánto dura tu música.
 
-## Table of Contents
+## La idea
 
-- [OS Support](#os-support)
-- [Requirements](#requirements)
-- [Development](#development)
-  - [Install Dependencies](#install-dependencies)
-  - [Create an upgrade link](#create-an-upgrade-link)
-  - [Start](#start)
-- [Architecture](#architecture)
-  - [Updates](#updates)
-  - [Workers](#workers)
-- [Peer-to-Peer Deployments](#peer-to-peer-deployments)
-- [Installing Distributables](#installing-distributables)
-- [Scripts](#scripts)
-- [Project Structure](#project-structure)
-- [Troubleshooting](#troubleshooting)
+Chakai comparte los archivos **directamente entre las computadoras de la banda**. No hay servidor: los archivos viven donde vive la música. Mientras alguien del grupo tenga la app abierta, el resto puede bajar.
 
-## OS Support
+Es el mismo principio de un torrent, aplicado a una sala de ensayo.
 
-- **macOS** — arm64, x64
-- **Linux** — arm64, x64
-- **Windows** — arm64, x64
+## Cómo se usa
 
-## Requirements
+Quien tiene los archivos abre la sala:
 
-- `npm` via [Node.js][nodejs]
-- [pear][pear-docs] - `npx pear`
+```sh
+chakai share zamba-nueva bajo-toma3.wav partitura.pdf
+```
 
-## Development
+Eso imprime un código. Se lo pasa a la banda por donde sea (WhatsApp, Telegram) — una sola vez, y no vuelve a mandar archivos nunca más.
 
-### Install Dependencies
+Los demás lo bajan:
+
+```sh
+chakai join <codigo> ./mis-descargas
+```
+
+Los archivos aparecen en la carpeta. Y quien los bajó queda también compartiendo, así que cuantos más son, mejor anda.
+
+## Instalación
+
+```sh
+pear install pear://ipuh57fdpuh5fxcc7533g67wttmxb8ajhobbykzd5z8cfdtcepwo
+```
+
+No hay descarga desde una web ni app store: el binario viaja por la misma red P2P. Las actualizaciones también — si publicamos una versión nueva, te llega sola.
+
+## Cómo está hecho
+
+Construido sobre el stack de Holepunch, partiendo del template oficial [`hello-pear-bare`](https://github.com/holepunchto/hello-pear-bare), **variante `main`** (el updater corre en un worker thread, que es lo indicado para un programa que queda abierto).
+
+| Pieza | Para qué |
+|---|---|
+| **Hyperdrive** | El sistema de archivos que se replica entre pares. Una sala = un drive. |
+| **Corestore** | Guarda los datos del drive en disco. |
+| **Hyperswarm** | Encuentra a los otros músicos. Se une a la `discoveryKey`, que es un hash de la clave pública — así, alguien que mire la red no puede deducir el código de la sala. |
+| **Bare** | El runtime. Compila a un binario por sistema operativo, sin necesidad de instalar Node. |
+| **pear-runtime** | Las actualizaciones over-the-air, peer-to-peer. |
+
+Código relevante: [`lib/room.js`](lib/room.js) (replicación y archivos) y [`bin.mjs`](bin.mjs) (comandos).
+
+### Seguridad del código de sala
+
+El código que se comparte es la clave pública del drive. El swarm se une a la `discoveryKey` (un hash de esa clave), no a la clave misma. Alguien que observe el tráfico de la red ve el hash pero no puede reconstruir la clave, así que no puede leer el contenido de la sala.
+
+## Plataformas compiladas
+
+- Linux x64
+- Windows x64
+- macOS Apple Silicon (arm64)
+- macOS Intel (x64)
+
+## Límites, dicho de frente
+
+- **Es de un solo escritor.** Quien abre la sala es el que puede agregar archivos; los demás descargan. Para que toda la banda escriba en la misma sala hace falta Autobase, que quedó fuera del alcance de un fin de semana.
+- **Alguien tiene que estar en línea.** Es inherente al P2P: si nadie que tenga el archivo está conectado, no hay de dónde bajarlo. En una banda trabajando sobre el mismo tema en general hay alguien con la máquina abierta, y cada persona que descarga pasa a ser una fuente más. Pero no es magia: no reemplazamos el servidor por nada, lo reemplazamos por las computadoras de la propia banda.
+- **Los archivos se cargan enteros en memoria** al subir y bajar. Anda bien con stems normales; para sesiones de varios GB habría que pasar a streams.
+
+## Desarrollo
 
 ```sh
 npm install
+npm start -- share prueba archivo.wav      # compartir
+npm start -- join <codigo> ./descargas     # descargar
 ```
 
-### Create an upgrade link
-
-This template expects `package.json` to contain a valid `pear://` link in the `upgrade` field. If it still contains the placeholder `pear://<YOUR_KEY_HERE>`, startup will fail with `INVALID_URL`.
-
-Create a link with [`pear touch`](https://docs.pears.com/reference/cli.html#pear-touch-flags-channel):
+Para compilar los binarios:
 
 ```sh
-pear touch
+npm run make                # el de tu sistema
+npm run make:win32-x64      # o uno específico
 ```
 
-Copy the generated `pear://...` link into the `upgrade` field in `package.json`.
+## Licencia
 
-### Start
-
-Start app in development mode:
-
-```sh
-npm start
-```
-
-By default this repo starts with `--no-updates` in development to avoid local dev binaries being swapped while you iterate.
-
-Enable updates for local flow testing:
-
-```sh
-npm start -- --updates
-```
-
-## Architecture
-
-### Updates
-
-Updates are managed by the `App` class in `app.js`, which wraps the updater lifecycle as a ready resource and emits update events for `bin.mjs` to log.
-
-The worker uses `pear-runtime` and the configured `upgrade` link in `package.json`.
-
-Per-run disable updates:
-
-```sh
-npm start -- --no-updates
-```
-
-### Workers
-
-The main CLI starts `workers/main.js` as a Bare sidecar and communicates with it over framed IPC.
-
-## Peer-to-Peer Deployments
-
-Use the [`pear`][pear-docs] CLI to deploy applications.
-
-Set the `upgrade` field in `package.json` to your distribution drive link, then follow the default flow from section 4 onward:
-
-[hello-pear-electron: 4. Build Deployment Directory and onward](https://github.com/holepunchto/hello-pear-electron#4-build-deployment-directory-)
-
-## Installing Distributables
-
-Once the `pear://<key>` upgrade link is seeding the build deployment folder the CLI standalone binary can be installed peer-to-peer directly onto the system with Pear:
-
-```sh
-npx pear-install pear://<key>
-```
-
-## Scripts
-
-- `npm start` - run the Bare CLI in dev mode (`bare bin.mjs --no-updates`)
-- `npm test` - run `brittle-bare` tests
-- `npm run lint` - run prettier check and lunte
-- `npm run format` - format repository with prettier
-- `npm run make` - auto-detect host OS/arch and run matching build target
-- `npm run make:darwin-arm64` - build standalone to `out/darwin-arm64`
-- `npm run make:darwin-x64` - build standalone to `out/darwin-x64`
-- `npm run make:linux-arm64` - build standalone to `out/linux-arm64`
-- `npm run make:linux-x64` - build standalone to `out/linux-x64`
-- `npm run make:win32-arm64` - build standalone to `out/win32-arm64`
-- `npm run make:win32-x64` - build standalone to `out/win32-x64`
-
-## Project Structure
-
-- `bin.mjs` - CLI entrypoint and runtime wiring
-- `app.js` - update resource used by the entrypoint
-- `workers/main.js` - Bare worker example
-- `scripts/make.js` - platform/arch build target selector
-- `test/index.js` - brittle-bare tests
-
-## Troubleshooting
-
-- `INVALID_URL: Invalid URL 'pear://<YOUR_KEY_HERE>'` means the placeholder `upgrade` link in `package.json` has not been replaced. Run `pear touch`, then put the generated `pear://...` link in `package.json`.
-- If updates do not trigger, verify `package.json` contains a valid `upgrade` Pear link and that peers are seeding the target drive.
-- If `npm run make` fails on unsupported hosts, run a specific `make:<platform>-<arch>` script or build on a supported host.
-- This template does not implement app-level data persistence; it is a minimal CLI + updater example.
-
-<!-- Reference Links -->
-
-[pear-docs]: https://docs.pears.com
-[hello-pear-worker]: https://github.com/holepunchto/hello-pear-worker
-[pear-runtime]: https://github.com/holepunchto/pear-runtime
-[Bare]: https://github.com/holepunchto/bare
-[nodejs]: https://nodejs.org
-[bare-build]: https://github.com/holepunchto/bare-build
+Apache-2.0
