@@ -1,52 +1,71 @@
 # Chakai
 
-> Compartí stems y partituras con tu banda. Sin servidor, sin límite de tamaño, sin que el link venza a los 7 días.
+> Control de versiones y sincronización para proyectos musicales. Como git, pero para Ableton y Reaper — y sin servidor.
 
-Aleph Hackathon 2026 — chapter Salta · **Pears Track**
+Aleph Hackathon 2026 — chapter Salta · **Pears Track** + **General Track**
 
 ## El problema
 
-Una banda graba en estudios caseros distintos. Para pasarse el trabajo:
+Una banda graba en estudios caseros distintos, y hoy se pasa el trabajo por WhatsApp (que comprime el audio), WeTransfer (que vence a los 7 días) o Drive (que se llena). Todos tienen un servidor de una empresa en el medio, que cuesta plata y decide cuánto dura tu música.
 
-- **WhatsApp** comprime el audio y arruina el stem.
-- **WeTransfer** vence a los 7 días.
-- **Google Drive** se llena, y hay que pagar para que no se llene.
+Pero el problema de fondo es otro, y es doble:
 
-Todos esos caminos tienen algo en común: un servidor de una empresa en el medio, que cuesta plata y que decide cuánto dura tu música.
+**1. Un proyecto de DAW no es un archivo.** Un proyecto de Ableton Live o Reaper es un árbol de carpetas — el `.als`, `Samples/`, `Ableton Project Info/` — y si la estructura se pierde, el proyecto no abre. Por eso se termina comprimiendo todo en un ZIP y subiéndolo entero cada vez que cambian dos compases.
 
-Y hay algo peor: **un proyecto de DAW no es un archivo.** Un proyecto de Ableton Live o Reaper es un árbol de carpetas — el `.als`, `Samples/`, `Ableton Project Info/`, los backups — y si la estructura se pierde, el proyecto no abre. Por eso hoy se termina comprimiendo todo en un ZIP y subiéndolo entero cada vez que cambian dos compases.
+**2. No hay historial.** El programador tiene git desde hace veinte años: puede volver a como estaba ayer, ver qué cambió, recuperar lo que rompió. El músico tiene `mezcla_final_v3_ESTA_SI.als` y un `Backup/` que nadie entiende. Si a las dos de la mañana arruinás la mezcla, no hay vuelta atrás.
 
-Chakai manda la carpeta completa, con su estructura intacta, directo a las computadoras de la banda.
-
-## La idea
-
-Chakai comparte los archivos **directamente entre las computadoras de la banda**. No hay servidor: los archivos viven donde vive la música. Mientras alguien del grupo tenga la app abierta, el resto puede bajar.
-
-Es el mismo principio de un torrent, aplicado a una sala de ensayo.
+Chakai resuelve las dos: manda la carpeta completa con su estructura intacta, y le pone un historial de versiones que viaja con el proyecto.
 
 ## Cómo se usa
 
-Quien tiene el proyecto abre la sala. Se le puede pasar una carpeta entera:
+Abrís la sala con la carpeta del proyecto:
 
 ```sh
 chakai share ecos "Ecos de la Pacha/tema_principal Project"
 ```
 
-O archivos sueltos, si es lo que hace falta:
+Eso comparte **y se queda vigilando**. Cada vez que guardás en el DAW, Chakai registra una *toma* nueva solo — no hay que acordarse de nada. Espera a que la escritura se calme antes de guardar, así una ráfaga de autoguardado no genera treinta versiones basura.
+
+Te imprime un código. Se lo pasás a la banda una sola vez, y no volvés a mandar archivos nunca más.
+
+Los demás entran:
 
 ```sh
-chakai share zamba-nueva bajo-toma3.wav partitura.pdf
+chakai join <codigo> ./mis-proyectos
 ```
 
-Eso imprime un código. Se lo pasa a la banda por donde sea (WhatsApp, Telegram) — una sola vez, y no vuelve a mandar archivos nunca más.
+El proyecto se reconstruye igual del otro lado, subdirectorios incluidos: se abre en el DAW y listo. Y queda **sincronizando**: cuando vos guardás una toma nueva, les llega sola.
 
-Los demás lo bajan:
+### El historial
 
 ```sh
-chakai join <codigo> ./mis-descargas
+chakai log ecos
 ```
 
-La carpeta del proyecto se reconstruye igual del otro lado, subdirectorios incluidos: se abre en el DAW y listo. Y quien lo bajó queda también compartiendo, así que cuantos más son, mejor anda.
+```
+Historial de "ecos" — 2 toma(s)
+
+#2  2026-08-22 18:46
+     ~ Ecos Project/tema.als
+     ~ Ecos Project/Samples/bajo.wav
+#1  2026-08-22 18:45
+     ~ Ecos Project/tema.als
+     ~ Ecos Project/Samples/bombo.wav
+```
+
+Y cuando rompiste la mezcla:
+
+```sh
+chakai restore ecos 1
+```
+
+El historial vive **dentro del proyecto**, así que no es un registro local tuyo: cuando un compañero se une, recibe también toda la historia de tomas.
+
+### Por qué no hace falta reenviar todo
+
+Hyperdrive transfiere solo los bloques que cambiaron. Si editás dos compases de un proyecto de 2 GB, viaja la diferencia, no los 2 GB. Eso es justo lo que un ZIP en WeTransfer no puede hacer.
+
+Y quien descargó queda también compartiendo, así que cuantos más son, mejor anda.
 
 Probado con un proyecto real de Ableton Live: 11 archivos entre `Backup/`, `Samples/` y `Ableton Project Info/`, todos verificados idénticos byte a byte del otro lado.
 
@@ -70,13 +89,23 @@ Construido sobre el stack de Holepunch, partiendo del template oficial [`hello-p
 
 | Pieza | Para qué |
 |---|---|
-| **Hyperdrive** | El sistema de archivos que se replica entre pares. Una sala = un drive. |
+| **Hyperdrive** | El sistema de archivos que se replica entre pares. Una sala = un drive. Su historial de versiones (`version`, `checkout`, `diff`) es lo que hace posible `log` y `restore`. |
 | **Corestore** | Guarda los datos del drive en disco. |
 | **Hyperswarm** | Encuentra a los otros músicos. Se une a la `discoveryKey`, que es un hash de la clave pública — así, alguien que mire la red no puede deducir el código de la sala. |
 | **Bare** | El runtime. Compila a un binario por sistema operativo, sin necesidad de instalar Node. |
 | **pear-runtime** | Las actualizaciones over-the-air, peer-to-peer. |
 
-Código relevante: [`lib/room.js`](lib/room.js) (replicación y archivos) y [`bin.mjs`](bin.mjs) (comandos).
+El control de versiones no se construyó desde cero: Hypercore, que está debajo de Hyperdrive, es un registro de solo-agregado. Cada escritura deja la anterior intacta y accesible. Chakai expone eso en términos que un músico entiende.
+
+Código relevante: [`lib/room.js`](lib/room.js) (replicación y archivos), [`lib/watch.js`](lib/watch.js) (detección de cambios), [`lib/versions.js`](lib/versions.js) (historial de tomas) y [`bin.mjs`](bin.mjs) (comandos).
+
+### Por qué "tomas" y no versiones del drive
+
+`drive.version` sube una vez por archivo escrito: un solo guardado de Ableton puede moverla de 4 a 15. Ese número no le sirve a nadie. Chakai agrupa los archivos que cambiaron juntos en una **toma**, con su fecha, y guarda ese índice en `/.chakai/history.json` dentro del propio drive — así el historial viaja a toda la banda, y se excluye al escribir el proyecto en disco.
+
+### Cómo se detectan los cambios
+
+Recorriendo la carpeta cada pocos segundos y comparando tamaño y fecha de modificación, en vez de usar `fs.watch` (que en Bare es terreno incierto). Un DAW guarda en ráfagas — el `.als`, después los samples, después el índice — así que se espera a que pase un ciclo entero sin movimiento antes de cerrar la toma. Sin eso saldrían decenas de versiones basura, algunas con archivos a medio escribir.
 
 ### Seguridad del código de sala
 
@@ -103,16 +132,30 @@ Así nunca compiten por el lock. Sin esto, la segunda ventana abortaba con `Core
 
 ## Límites, dicho de frente
 
-- **Es de un solo escritor.** Quien abre la sala es el que puede agregar archivos; los demás descargan. Para que toda la banda escriba en la misma sala hace falta Autobase, que quedó fuera del alcance de un fin de semana.
+- **Es de un solo escritor.** Quien abre la sala es el que puede agregar archivos y registrar tomas; los demás sincronizan y pueden recuperar cualquier toma, pero no escribir. Para que toda la banda escriba en la misma sala hace falta Autobase, que quedó fuera del alcance de un fin de semana. Hoy el modelo es el de un estudio: alguien lleva la sesión, el resto la sigue.
 - **Alguien tiene que estar en línea.** Es inherente al P2P: si nadie que tenga el archivo está conectado, no hay de dónde bajarlo. En una banda trabajando sobre el mismo tema en general hay alguien con la máquina abierta, y cada persona que descarga pasa a ser una fuente más. Pero no es magia: no reemplazamos el servidor por nada, lo reemplazamos por las computadoras de la propia banda.
 - **Los archivos se cargan enteros en memoria** al subir y bajar. Anda bien con stems normales; para sesiones de varios GB habría que pasar a streams.
+- **`restore` escribe en una carpeta aparte**, no pisa el proyecto original. Es a propósito: preferimos que el músico compare y decida antes de sobrescribir su sesión.
+- **La detección de cambios es por sondeo**, cada 3 segundos. Un cambio puede tardar unos segundos en registrarse. Para el ritmo de trabajo de una sesión de música es de sobra, pero no es instantáneo.
+
+## Comandos
+
+| Comando | Qué hace |
+|---|---|
+| `chakai share <sala> <carpeta>` | Comparte el proyecto y vigila los cambios, registrando tomas |
+| `chakai join <codigo> [carpeta]` | Descarga el proyecto y queda sincronizando |
+| `chakai log <sala>` | Historial de tomas, con fecha y qué cambió |
+| `chakai restore <sala> <toma> [carpeta]` | Recupera el proyecto como estaba en esa toma |
+| `chakai` | Muestra la ayuda y busca actualizaciones |
 
 ## Desarrollo
 
 ```sh
 npm install
-npm start -- share prueba archivo.wav      # compartir
-npm start -- join <codigo> ./descargas     # descargar
+npm start -- share ecos "ruta/al/Proyecto"   # compartir y vigilar
+npm start -- join <codigo> ./descargas       # descargar y sincronizar
+npm start -- log ecos                        # historial
+npm start -- restore ecos 1 ./vuelta         # recuperar una toma
 ```
 
 Para compilar los binarios:
