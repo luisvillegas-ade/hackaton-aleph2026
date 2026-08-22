@@ -210,6 +210,8 @@ try {
     for (const f of subidos) ui.printSuccess(`+ ${f.rel} (${humanSize(f.size)})`)
 
     console.log('')
+    ui.printPath('carpeta:', folder)
+    console.log('')
     if (action.code) {
       ui.printInfo(`Sesión abierta — ${subidos.length} archivo(s) tuyos publicados\n`)
     } else {
@@ -249,6 +251,9 @@ try {
                 if (e.conflicts > 0) {
                   ui.printMuted(`   ${e.conflicts} pista(s) tocadas por los dos: se conservó la tuya`)
                 }
+                // Es el archivo que el músico va a querer abrir: se muestra
+                // en el formato que puede pegar en Reaper sin traducirlo.
+                ui.printPath('abrilo en:', path.join(folder, ...e.rel.split('/')))
               } else if (e.action === 'copia') ui.printMuted(`   guardado aparte: ${e.rel}`)
               else if (e.action === 'error-fusion') ui.printError(`no se pudo fusionar ${e.rel}`)
             }

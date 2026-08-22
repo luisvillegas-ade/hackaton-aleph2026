@@ -1,8 +1,10 @@
 # Chakai
 
-> Control de versiones y sincronización para proyectos musicales. Como git, pero para Ableton y Reaper — y sin servidor.
+> Control de versiones y colaboración para proyectos musicales. Como git, pero para Reaper y Ableton — y sin servidor.
 
 Aleph Hackathon 2026 — chapter Salta · **Pears Track** + **General Track**
+
+**Dos músicos graban pistas distintas al mismo tiempo, cada uno en su casa, y el proyecto termina con las dos.** Sin servidor, sin turnos, sin pisarse.
 
 ## El problema
 
