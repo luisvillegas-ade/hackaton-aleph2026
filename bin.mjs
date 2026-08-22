@@ -64,31 +64,40 @@ const updates = cmd.flags.updates
 const storage = cmd.flags.storage || (isDev ? null : path.join(persistent(), appName))
 const dir = storage || path.join(os.tmpdir(), 'pear', appName)
 
-console.log(`Updates: ${updates === false ? 'disabled' : 'enabled'}`)
+// El updater guarda su estado en un Corestore con lock exclusivo sobre
+// `dir`. Dos procesos no pueden tenerlo a la vez: el segundo revienta con
+// "Corestore is closed" desde su worker, y como el error es asincrónico y
+// vive en otro hilo, no hay try/catch que lo agarre — aborta el proceso.
+//
+// Como es normal tener varias salas abiertas al mismo tiempo (una por
+// canción), el updater corre únicamente en la invocación sin comando:
+// `chakai` a secas busca actualizaciones, y `share`/`join` se dedican a
+// mover archivos. Así nunca compiten por el lock.
+const wantsUpdater = action === null && updates !== false
 
-const app = new App({
-  dir,
-  app: isDev ? null : os.execPath(),
-  updates,
-  version: pkg.version,
-  upgrade: pkg.upgrade,
-  name: isWindows ? appName + '.exe' : appName
-})
+console.log(`Updates: ${wantsUpdater ? 'enabled' : 'disabled'}`)
 
-app.on('message', (message) => console.log(message))
-app.on('updating', () => console.log('[updater] getting new update'))
-app.on('updating-delta', (delta) => console.log('[updater]', delta))
-app.on('updated', () => console.log('[updater] update complete... applying'))
-app.on('update-applied', () =>
-  console.log('[updater] applied update, restart to run latest version')
-)
-app.on('error', (err) => {
-  // El updater comparte un almacenamiento con lock entre instancias. Que no
-  // pueda tomarlo es esperable si ya hay otra ventana abierta, y se avisa
-  // más abajo con un mensaje entendible en vez de este volcado.
-  if (/could not be locked/i.test(err.message)) return
-  console.error('[app:error]', err.message)
-})
+const app = wantsUpdater
+  ? new App({
+      dir,
+      app: isDev ? null : os.execPath(),
+      updates,
+      version: pkg.version,
+      upgrade: pkg.upgrade,
+      name: isWindows ? appName + '.exe' : appName
+    })
+  : null
+
+if (app !== null) {
+  app.on('message', (message) => console.log(message))
+  app.on('updating', () => console.log('[updater] getting new update'))
+  app.on('updating-delta', (delta) => console.log('[updater]', delta))
+  app.on('updated', () => console.log('[updater] update complete... applying'))
+  app.on('update-applied', () =>
+    console.log('[updater] applied update, restart to run latest version')
+  )
+  app.on('error', (err) => console.error('[app:error]', err.message))
+}
 
 let room = null
 
@@ -101,7 +110,8 @@ async function shutdown(code) {
     await r.swarm.destroy().catch(() => {})
     await r.drive.close().catch(() => {})
   }
-  await app.exit(code)
+  if (app !== null) await app.exit(code)
+  else Bare.exit(code)
 }
 
 process.on('SIGHUP', () => shutdown(129))
@@ -109,14 +119,7 @@ process.on('SIGINT', () => shutdown(130))
 process.on('SIGQUIT', () => shutdown(131))
 process.on('SIGTERM', () => shutdown(143))
 
-// Las actualizaciones son un extra, no un requisito para compartir archivos.
-// Si ya hay otra ventana de Chakai abierta en esta máquina, el updater no
-// puede tomar su lock — antes eso mataba la app entera. Ahora seguimos igual.
-try {
-  await app.ready()
-} catch {
-  console.log('\nℹ  Actualizaciones desactivadas en esta ventana (ya hay otra abierta).')
-}
+if (app !== null) await app.ready()
 
 try {
   if (action === null) {
