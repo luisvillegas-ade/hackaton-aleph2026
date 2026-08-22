@@ -1,0 +1,123 @@
+
+# Guion del video demo — Chakai
+
+**Requisitos del track (excluyentes):** 3 minutos, en inglés **o** español con subtítulos en inglés. Tiene que mostrar la instalación con `pear install` **y** un update OTA llegando.
+
+**Recomendación:** grabar en español y subtitular en inglés. Luis habla natural y se nota.
+
+**Qué se graba:** dos terminales y dos Reaper visibles. Con el proyecto real (`beto prueba`), no con archivos de juguete.
+
+---
+
+## 0:00 – 0:30 · El problema
+
+> "Una banda graba en estudios distintos. Para pasarse el trabajo usan WhatsApp, que comprime el audio; WeTransfer, que vence a los siete días; o Drive, que se llena.
+>
+> Pero el problema de fondo es otro: un proyecto de Reaper o Ableton **no es un archivo**, es una carpeta entera. Y si dos músicos graban a la vez, uno pisa al otro. Por eso hoy se trabaja por turnos: 'terminá vos y después lo agarro yo'."
+
+*En pantalla: la carpeta real del proyecto con sus WAV y el `.rpp`.*
+
+## 0:30 – 0:50 · Qué es Chakai
+
+> "Chakai es control de versiones y colaboración para proyectos musicales. Como git, pero para Reaper y Ableton. Sin servidor: los proyectos viajan directo entre las computadoras de la banda."
+
+## 0:50 – 1:20 · Instalación (REQUISITO)
+
+*Terminal B, máquina limpia:*
+
+```sh
+pear install pear://ipuh57fdpuh5fxcc7533g67wttmxb8ajhobbykzd5z8cfdtcepwo
+```
+
+> "Se instala desde la propia red peer-to-peer. No hay página de descarga ni app store: el binario viaja por el mismo swarm."
+
+## 1:20 – 2:10 · La escena que gana: dos músicos grabando a la vez
+
+Esta es la parte que hay que clavar. Dos terminales y dos Reaper visibles.
+
+*Terminal A:*
+```sh
+chakai open "Beto Prueba"
+```
+> "Abro la sesión con mi proyecto. Me da un código."
+
+*Terminal B:*
+```sh
+chakai open "Beto Prueba" <codigo>
+```
+> "El bajista entra desde su casa, con su copia."
+
+*Ahora, en Reaper A: agregar una pista, grabar algo corto, Ctrl+S.*
+*En Reaper B: agregar otra pista distinta, Ctrl+S.*
+
+> "Los dos grabamos al mismo tiempo, cada uno lo suyo. Nadie pidió turno."
+
+*Se ve en ambas terminales: `⇉ beto prueba (fusionado).rpp — 1 pista sumada`, con la ruta lista para abrir.*
+
+*Abrir el fusionado en Reaper y mostrar **las dos pistas nuevas juntas**.*
+
+> "Y el proyecto quedó con las dos pistas. No es que uno pisó al otro: se fusionaron."
+
+**Por qué esto pega:** Avid Cloud Collaboration resuelve esto con turnos — una persona por pista. Splice te avisa del conflicto pero no fusiona. Vale decirlo en una línea, sin agrandarse:
+
+> "Las herramientas comerciales resuelven esto con turnos o avisándote del conflicto. Acá se fusiona, porque Reaper le da un identificador único a cada pista y eso permite combinarlas."
+
+## 2:10 – 2:30 · El historial
+
+```sh
+chakai log ecos
+```
+
+> "Y cada guardado quedó registrado. Tengo el historial del proyecto."
+
+*Se ve la lista de tomas con fechas y archivos.*
+
+```sh
+chakai restore ecos 1
+```
+
+> "Rompí la mezcla a las dos de la mañana. Vuelvo a la de ayer."
+
+**Detalle que suma, si entra:** Hyperdrive transfiere solo los bloques que cambiaron. Editás dos compases de un proyecto de 2 GB y viaja la diferencia, no los 2 GB. Un ZIP en WeTransfer no puede hacer eso.
+
+## 2:30 – 2:45 · El update OTA (REQUISITO)
+
+*Publicar una versión nueva desde una terminal; en la otra, la instancia ya instalada la recibe sola.*
+
+> "Las actualizaciones también viajan peer-to-peer. Nadie reinstala nada."
+
+## 2:45 – 3:00 · Cierre honesto
+
+> "Chakai no reemplaza el servidor por nada: lo reemplaza por las computadoras de la banda. Si nadie está conectado, no hay de dónde bajar — es el precio de no pagar infraestructura nunca.
+>
+> La fusión por pista hoy funciona con Reaper. El formato de Ableton es distinto y queda como próximo paso.
+>
+> Y si dos tocan la misma pista, gana la tuya y se guarda la del otro al lado: no fusionamos adentro de una pista."
+
+**Por qué cerrar así:** el juez del track es dmc, el creador de Pear. Conoce los compromisos del P2P de memoria. Reconocerlos suma; disimularlos se nota al instante. Y decir "esto funciona con Reaper, no con todo" evita que el jurado descubra el límite por su cuenta y desconfíe del resto.
+
+---
+
+## Checklist antes de grabar
+- [ ] Terminales con fuente grande y legible
+- [ ] El proyecto real de Reaper (`beto prueba`), no archivos de juguete
+- [ ] Las dos carpetas ya preparadas (`prueba-equipo/luis` y `prueba-equipo/ana`)
+- [ ] Ensayar una pasada completa: si falla en vivo se pierde el tiempo
+- [ ] Cronometrar — 3 minutos es el máximo
+- [ ] Subtítulos en inglés
+- [ ] **El `pear seed` corriendo**, si no la instalación del video falla
+
+## Si el tiempo aprieta, qué sacar
+En orden de qué se puede recortar sin perder la entrega:
+1. El historial (`log`/`restore`) — es lindo pero no es requisito
+2. El detalle de la transferencia incremental
+3. La comparación con Avid y Splice
+
+**Lo que NO se puede sacar nunca:** la instalación con `pear install` y el update OTA. Sin esas dos escenas el track no lo puntúa.
+
+## Relacionado
+- [[plan-desarrollo-etapas]]
+- [[aleph-hackathon-salta]]
+- [[como-probarlo-vos-mismo]]
+
+#proyecto
