@@ -7,6 +7,7 @@ import path from 'bare-path'
 import pkg from './package.json'
 import App from './app.js'
 import { openRoom, parseCode, addPath, listFiles, downloadAll, humanSize } from './lib/room.js'
+import ui from './lib/ui.js'
 
 const appName = pkg.productName || pkg.name
 const isDev = path.basename(Bare.argv[0]) === (isWindows ? 'bare.exe' : 'bare')
@@ -123,23 +124,26 @@ if (app !== null) await app.ready()
 
 try {
   if (action === null) {
-    console.log(`\n🎵 Chakai v${pkg.version} — stems y partituras entre la banda, sin servidor\n`)
-    console.log('  chakai share <sala> [archivos...]   compartir con la banda')
-    console.log('  chakai join <codigo> [carpeta]     descargar de una sala\n')
+    ui.printLogo()
+    ui.printInfo(`Chakai v${pkg.version} — stems y partituras entre la banda, sin servidor\n`)
+    ui.printMuted('  chakai share <sala> [archivos...]   compartir con la banda')
+    ui.printMuted('  chakai join <codigo> [carpeta]     descargar de una sala\n')
   } else if (action.type === 'share') {
     room = await openRoom({ storageDir: path.join(dir, 'rooms', action.room) })
 
     for (const target of action.files) {
       const added = await addPath(room.drive, target)
-      for (const f of added) console.log(`  + ${f.name} (${humanSize(f.size)})`)
+      for (const f of added) ui.printSuccess(`+ ${f.name} (${humanSize(f.size)})`)
     }
 
     const files = await listFiles(room.drive)
-    console.log(`\n🎵 Sala "${action.room}" — ${files.length} archivo(s)\n`)
-    console.log('Pasale este código a la banda:\n')
-    console.log(`  ${room.drive.key.toString('hex')}\n`)
-    console.log('Ellos lo bajan con:  chakai join <codigo>')
-    console.log('\nCompartiendo. Dejá esta ventana abierta. Ctrl+C para cortar.\n')
+    console.log('')
+    ui.printInfo(`Sala "${action.room}" — ${files.length} archivo(s)\n`)
+    ui.printMuted('Pasale este código a la banda:')
+    ui.printFrame(room.drive.key.toString('hex'))
+    ui.printMuted('Ellos lo bajan con:  chakai join <codigo>')
+    console.log('')
+    ui.printInfo('Compartiendo. Dejá esta ventana abierta. Ctrl+C para cortar.\n')
   } else if (action.type === 'join') {
     const key = parseCode(action.code)
     room = await openRoom({
@@ -147,21 +151,27 @@ try {
       key
     })
 
-    console.log(`\n🎵 Conectando a la sala ${action.code.slice(0, 12)}...\n`)
+    console.log('')
+    ui.printInfo(`Conectando a la sala ${action.code.slice(0, 12)}...\n`)
     await room.drive.update()
 
-    const saved = await downloadAll(room.drive, action.target)
+    const saved = await downloadAll(room.drive, action.target, (f) => {
+      ui.printSuccess(`↓ ${f.name} (${humanSize(f.size)})`)
+    })
+    
     if (saved.length === 0) {
-      console.log('  (todavía no hay archivos, o nadie está compartiendo ahora)\n')
+      ui.printMuted('  (todavía no hay archivos, o nadie está compartiendo ahora)\n')
     } else {
-      for (const f of saved) console.log(`  ↓ ${f.name} (${humanSize(f.size)})`)
-      console.log(`\nGuardado en ${action.target}\n`)
+      console.log('')
+      ui.printSuccess(`Guardado en ${action.target}\n`)
     }
-    console.log('Sigo conectado para que otros puedan bajar de acá. Ctrl+C para cortar.\n')
+    ui.printInfo('Sigo conectado para que otros puedan bajar de acá. Ctrl+C para cortar.\n')
   }
 } catch (err) {
   // Errores del usuario (código mal pegado, archivo inexistente): mensaje
   // claro, sin volcado de pila.
-  console.error(`\n✖ ${err.message}\n`)
+  console.log('')
+  ui.printError(err.message)
+  console.log('')
   await shutdown(1)
 }
