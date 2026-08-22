@@ -1,12 +1,24 @@
 import { command, flag, summary, arg, rest } from 'paparam'
 import { persistent } from 'bare-storage'
 import process from 'bare-process'
+import fs from 'bare-fs'
 import os from 'bare-os'
 import { isWindows } from 'which-runtime'
 import path from 'bare-path'
 import pkg from './package.json'
 import App from './app.js'
-import { openRoom, parseCode, addPath, listFiles, downloadAll, humanSize } from './lib/room.js'
+import {
+  openRoom,
+  parseCode,
+  addPath,
+  addOne,
+  removeOne,
+  listFiles,
+  downloadAll,
+  humanSize
+} from './lib/room.js'
+import { watchFolder } from './lib/watch.js'
+import { readHistory, appendTake, restoreTake, formatDate } from './lib/versions.js'
 import ui from './lib/ui.js'
 
 const appName = pkg.productName || pkg.name
@@ -44,6 +56,31 @@ const joinCmd = command(
   }
 )
 
+const logCmd = command(
+  'log',
+  summary('Ver el historial de tomas de una sala'),
+  arg('<sala>', 'nombre de la sala'),
+  () => {
+    action = { type: 'log', room: logCmd.args.sala }
+  }
+)
+
+const restoreCmd = command(
+  'restore',
+  summary('Volver el proyecto a una toma anterior'),
+  arg('<sala>', 'nombre de la sala'),
+  arg('<toma>', 'número de toma (se ve con: chakai log)'),
+  arg('[carpeta]', 'dónde escribirla (por defecto ./chakai-restore)'),
+  () => {
+    action = {
+      type: 'restore',
+      room: restoreCmd.args.sala,
+      take: Number(restoreCmd.args.toma),
+      target: restoreCmd.args.carpeta || './chakai-restore'
+    }
+  }
+)
+
 const cmd = command(
   appName,
   summary(pkg.description),
@@ -51,7 +88,9 @@ const cmd = command(
   flag('--storage <dir>', 'custom storage directory'),
   flag('--no-updates', 'disable OTA updates for this run'),
   shareCmd,
-  joinCmd
+  joinCmd,
+  logCmd,
+  restoreCmd
 )
 
 cmd.parse(Bare.argv.slice(isDev ? 2 : 1))
@@ -131,9 +170,15 @@ try {
   } else if (action.type === 'share') {
     room = await openRoom({ storageDir: path.join(dir, 'rooms', action.room) })
 
+    const firstTake = []
     for (const target of action.files) {
       const added = await addPath(room.drive, target)
       for (const f of added) ui.printSuccess(`+ ${f.name} (${humanSize(f.size)})`)
+      firstTake.push(...added.map((f) => f.name))
+    }
+    if (firstTake.length > 0) {
+      const take = await appendTake(room.drive, { files: firstTake })
+      ui.printMuted(`  toma #${take.n} guardada`)
     }
 
     const files = await listFiles(room.drive)
@@ -143,7 +188,84 @@ try {
     ui.printFrame(room.drive.key.toString('hex'))
     ui.printMuted('Ellos lo bajan con:  chakai join <codigo>')
     console.log('')
+
+    // Vigilar las carpetas compartidas: cuando el músico guarda en el DAW,
+    // se registra una toma nueva sola, sin que tenga que acordarse de nada.
+    const stops = []
+    for (const target of action.files) {
+      const clean = target.replace(/[/\\]+$/, '')
+      let isDir = false
+      try {
+        isDir = (await fs.promises.stat(clean)).isDirectory()
+      } catch {}
+      if (!isDir) continue
+
+      const baseName = path.basename(clean)
+      stops.push(
+        watchFolder(clean, {
+          onSnapshot: async ({ changed, removed }) => {
+            const touched = []
+            for (const rel of changed) {
+              try {
+                const f = await addOne(room.drive, clean, baseName, rel)
+                touched.push(f.name)
+                ui.printSuccess(`~ ${f.name} (${humanSize(f.size)})`)
+              } catch {}
+            }
+            for (const rel of removed) {
+              const f = await removeOne(room.drive, baseName, rel)
+              ui.printMuted(`  - ${f.name}`)
+            }
+            if (touched.length === 0 && removed.length === 0) return
+            const take = await appendTake(room.drive, {
+              files: touched,
+              removed: removed.map((r) => path.join(baseName, r))
+            })
+            ui.printInfo(`toma #${take.n} — ${formatDate(take.at)}\n`)
+          }
+        })
+      )
+    }
+    if (stops.length > 0) {
+      ui.printMuted('Vigilando cambios: cuando guardes en el DAW se registra una toma sola.')
+    }
+
     ui.printInfo('Compartiendo. Dejá esta ventana abierta. Ctrl+C para cortar.\n')
+  } else if (action.type === 'log') {
+    room = await openRoom({ storageDir: path.join(dir, 'rooms', action.room) })
+    const history = await readHistory(room.drive)
+    console.log('')
+    if (history.length === 0) {
+      ui.printMuted('  Todavía no hay tomas en esta sala.\n')
+    } else {
+      ui.printInfo(`Historial de "${action.room}" — ${history.length} toma(s)\n`)
+      for (const t of history.slice().reverse()) {
+        ui.printSuccess(`#${t.n}  ${formatDate(t.at)}`)
+        for (const f of t.files.slice(0, 6)) ui.printMuted(`     ~ ${f}`)
+        if (t.files.length > 6) ui.printMuted(`     … y ${t.files.length - 6} más`)
+        for (const f of (t.removed || []).slice(0, 3)) ui.printMuted(`     - ${f}`)
+      }
+      console.log('')
+      ui.printMuted(`Para volver a una:  chakai restore ${action.room} <numero>`)
+      console.log('')
+    }
+    await shutdown(0)
+  } else if (action.type === 'restore') {
+    room = await openRoom({ storageDir: path.join(dir, 'rooms', action.room) })
+    const history = await readHistory(room.drive)
+    const take = history.find((t) => t.n === action.take)
+    if (!take) {
+      throw new Error(
+        `No existe la toma #${action.take} en "${action.room}". Miralas con: chakai log ${action.room}`
+      )
+    }
+    console.log('')
+    ui.printInfo(`Recuperando la toma #${take.n} del ${formatDate(take.at)}...\n`)
+    const written = await restoreTake(room.drive, take, action.target)
+    for (const f of written) ui.printSuccess(`↺ ${f.name} (${humanSize(f.size)})`)
+    console.log('')
+    ui.printSuccess(`Escrito en ${action.target}\n`)
+    await shutdown(0)
   } else if (action.type === 'join') {
     const key = parseCode(action.code)
     room = await openRoom({
@@ -165,7 +287,28 @@ try {
       console.log('')
       ui.printSuccess(`Guardado en ${action.target}\n`)
     }
-    ui.printInfo('Sigo conectado para que otros puedan bajar de acá. Ctrl+C para cortar.\n')
+
+    // Quedarse escuchando: si del otro lado registran una toma nueva, se baja
+    // sola. Hyperdrive transfiere solo los bloques que cambiaron, así que
+    // volver a bajar no reenvía el proyecto entero.
+    let known = room.drive.version
+    setInterval(async () => {
+      try {
+        await room.drive.update({ wait: true })
+        if (room.drive.version === known) return
+        known = room.drive.version
+
+        const nuevos = await downloadAll(room.drive, action.target)
+        console.log('')
+        ui.printInfo('Llegó una toma nueva:')
+        for (const f of nuevos) ui.printSuccess(`↓ ${f.name} (${humanSize(f.size)})`)
+        console.log('')
+      } catch {
+        // un ciclo fallido no debe cortar la sincronización
+      }
+    }, 4000)
+
+    ui.printInfo('Sincronizando. Lo que guarden del otro lado te llega solo. Ctrl+C para cortar.\n')
   }
 } catch (err) {
   // Errores del usuario (código mal pegado, archivo inexistente): mensaje
