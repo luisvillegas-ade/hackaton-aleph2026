@@ -1,4 +1,4 @@
-import { command, flag, summary, arg } from 'paparam'
+import { command, flag, summary, arg, rest } from 'paparam'
 import { persistent } from 'bare-storage'
 import process from 'bare-process'
 import os from 'bare-os'
@@ -6,7 +6,7 @@ import { isWindows } from 'which-runtime'
 import path from 'bare-path'
 import pkg from './package.json'
 import App from './app.js'
-import { newRoomCode, openRoom } from './lib/room.js'
+import { openRoom, parseCode, addFile, listFiles, downloadAll, humanSize } from './lib/room.js'
 
 const appName = pkg.productName || pkg.name
 const isDev = path.basename(Bare.argv[0]) === (isWindows ? 'bare.exe' : 'bare')
@@ -15,20 +15,31 @@ const isDev = path.basename(Bare.argv[0]) === (isWindows ? 'bare.exe' : 'bare')
 // después de que el updater esté listo, para no romper el OTA.
 let action = null
 
-const createCmd = command(
-  'create',
-  summary('Crear una sala nueva para una canción'),
+const shareCmd = command(
+  'share',
+  summary('Abrir una sala y compartir archivos con la banda'),
+  arg('<sala>', 'nombre de la canción o sesión'),
+  rest('[...archivos]'),
   () => {
-    action = { type: 'create' }
+    action = {
+      type: 'share',
+      room: shareCmd.args.sala,
+      files: shareCmd.rest || []
+    }
   }
 )
 
 const joinCmd = command(
   'join',
-  summary('Entrar a una sala existente'),
+  summary('Entrar a una sala y descargar lo que haya'),
   arg('<codigo>', 'código de la sala que te pasaron'),
+  arg('[carpeta]', 'dónde guardar los archivos (por defecto ./chakai)'),
   () => {
-    action = { type: 'join', code: joinCmd.args.codigo }
+    action = {
+      type: 'join',
+      code: joinCmd.args.codigo,
+      target: joinCmd.args.carpeta || './chakai'
+    }
   }
 )
 
@@ -38,7 +49,7 @@ const cmd = command(
   flag('--version|-v', 'Print the current version'),
   flag('--storage <dir>', 'custom storage directory'),
   flag('--no-updates', 'disable OTA updates for this run'),
-  createCmd,
+  shareCmd,
   joinCmd
 )
 
@@ -73,15 +84,16 @@ app.on('update-applied', () =>
 )
 app.on('error', (err) => console.error('[app:error]', err))
 
-let swarm = null
+let room = null
 
-// Al salir hay que cerrar el swarm además del updater: si no, quedan
+// Al salir hay que cerrar swarm y drive además del updater: si no, quedan
 // conexiones abiertas y el proceso no termina.
 async function shutdown(code) {
-  if (swarm !== null) {
-    const s = swarm
-    swarm = null
-    await s.destroy().catch(() => {})
+  if (room !== null) {
+    const r = room
+    room = null
+    await r.swarm.destroy().catch(() => {})
+    await r.drive.close().catch(() => {})
   }
   await app.exit(code)
 }
@@ -95,27 +107,40 @@ try {
   await app.ready()
 
   if (action === null) {
-    console.log('\nUsá "create" para abrir una sala o "join <codigo>" para entrar a una.')
-    console.log('Ctrl+C para salir.\n')
-  } else {
-    const code = action.type === 'create' ? newRoomCode() : action.code
+    console.log('\n  chakai share <sala> [archivos...]   compartir con la banda')
+    console.log('  chakai join <codigo> [carpeta]     descargar de una sala\n')
+  } else if (action.type === 'share') {
+    room = await openRoom({ storageDir: path.join(dir, 'rooms', action.room) })
 
-    if (action.type === 'create') {
-      console.log('\n🎵 Sala creada.\n')
-      console.log('Pasale este código a la banda:\n')
-      console.log(`  ${code}\n`)
-      console.log('Ellos entran con:  chakai join <codigo>\n')
-    } else {
-      console.log(`\n🎵 Entrando a la sala ${code.slice(0, 12)}...\n`)
+    for (const file of action.files) {
+      const { name, size } = await addFile(room.drive, file)
+      console.log(`  + ${name} (${humanSize(size)})`)
     }
 
-    swarm = await openRoom({
-      code,
-      onJoin: (id, total) => console.log(`  + se conectó ${id} (${total} en línea)`),
-      onLeave: (id, total) => console.log(`  - se fue ${id} (${total} en línea)`)
+    const files = await listFiles(room.drive)
+    console.log(`\n🎵 Sala "${action.room}" — ${files.length} archivo(s)\n`)
+    console.log('Pasale este código a la banda:\n')
+    console.log(`  ${room.drive.key.toString('hex')}\n`)
+    console.log('Ellos lo bajan con:  chakai join <codigo>')
+    console.log('\nCompartiendo. Dejá esta ventana abierta. Ctrl+C para cortar.\n')
+  } else if (action.type === 'join') {
+    const key = parseCode(action.code)
+    room = await openRoom({
+      storageDir: path.join(dir, 'joined', action.code.slice(0, 16)),
+      key
     })
 
-    console.log('Sala abierta. Esperando a los demás. Ctrl+C para salir.\n')
+    console.log(`\n🎵 Conectando a la sala ${action.code.slice(0, 12)}...\n`)
+    await room.drive.update()
+
+    const saved = await downloadAll(room.drive, action.target)
+    if (saved.length === 0) {
+      console.log('  (todavía no hay archivos, o nadie está compartiendo ahora)\n')
+    } else {
+      for (const f of saved) console.log(`  ↓ ${f.name} (${humanSize(f.size)})`)
+      console.log(`\nGuardado en ${action.target}\n`)
+    }
+    console.log('Sigo conectado para que otros puedan bajar de acá. Ctrl+C para cortar.\n')
   }
 } catch (err) {
   console.error('[app:error]', err)
