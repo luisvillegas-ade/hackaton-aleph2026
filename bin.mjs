@@ -19,6 +19,7 @@ import {
 } from './lib/room.js'
 import { watchFolder, scan } from './lib/watch.js'
 import { newSessionCode, openSession, closeSession } from './lib/session.js'
+import sessionCrypto from 'hypercore-crypto'
 import { applyPeer, publishLocal } from './lib/sync.js'
 import { readHistory, appendTake, restoreTake, formatDate } from './lib/versions.js'
 import ui from './lib/ui.js'
@@ -198,8 +199,14 @@ try {
     const code = action.code || newSessionCode()
     const folder = action.folder.replace(/[/\\]+$/, '')
 
+    // El almacenamiento se deriva del código Y de la carpeta local. Si solo
+    // dependiera del código, dos ventanas de la misma máquina en la misma
+    // sesión chocarían por el lock — que es exactamente el caso de una demo
+    // o de alguien participando desde dos proyectos distintos.
+    const slot = sessionCrypto.data(Buffer.from(code + '|' + folder)).toString('hex').slice(0, 16)
+
     session = await openSession({
-      storageDir: path.join(dir, 'sesiones', code.slice(0, 16)),
+      storageDir: path.join(dir, 'sesiones', slot),
       code,
       onPeer: (hex, total) => ui.printSuccess(`se sumó ${hex.slice(0, 8)} (${total} en la sala)`)
     })
