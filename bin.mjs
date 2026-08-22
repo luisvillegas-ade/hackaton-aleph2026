@@ -6,7 +6,7 @@ import { isWindows } from 'which-runtime'
 import path from 'bare-path'
 import pkg from './package.json'
 import App from './app.js'
-import { openRoom, parseCode, addFile, listFiles, downloadAll, humanSize } from './lib/room.js'
+import { openRoom, parseCode, addPath, listFiles, downloadAll, humanSize } from './lib/room.js'
 
 const appName = pkg.productName || pkg.name
 const isDev = path.basename(Bare.argv[0]) === (isWindows ? 'bare.exe' : 'bare')
@@ -129,9 +129,9 @@ try {
   } else if (action.type === 'share') {
     room = await openRoom({ storageDir: path.join(dir, 'rooms', action.room) })
 
-    for (const file of action.files) {
-      const { name, size } = await addFile(room.drive, file)
-      console.log(`  + ${name} (${humanSize(size)})`)
+    for (const target of action.files) {
+      const added = await addPath(room.drive, target)
+      for (const f of added) console.log(`  + ${f.name} (${humanSize(f.size)})`)
     }
 
     const files = await listFiles(room.drive)
