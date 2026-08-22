@@ -6,13 +6,17 @@ Aleph Hackathon 2026 — chapter Salta · **Pears Track**
 
 ## El problema
 
-Una banda graba en estudios caseros distintos. Para pasarse las tomas:
+Una banda graba en estudios caseros distintos. Para pasarse el trabajo:
 
 - **WhatsApp** comprime el audio y arruina el stem.
 - **WeTransfer** vence a los 7 días.
 - **Google Drive** se llena, y hay que pagar para que no se llene.
 
 Todos esos caminos tienen algo en común: un servidor de una empresa en el medio, que cuesta plata y que decide cuánto dura tu música.
+
+Y hay algo peor: **un proyecto de DAW no es un archivo.** Un proyecto de Ableton Live o Reaper es un árbol de carpetas — el `.als`, `Samples/`, `Ableton Project Info/`, los backups — y si la estructura se pierde, el proyecto no abre. Por eso hoy se termina comprimiendo todo en un ZIP y subiéndolo entero cada vez que cambian dos compases.
+
+Chakai manda la carpeta completa, con su estructura intacta, directo a las computadoras de la banda.
 
 ## La idea
 
@@ -22,7 +26,13 @@ Es el mismo principio de un torrent, aplicado a una sala de ensayo.
 
 ## Cómo se usa
 
-Quien tiene los archivos abre la sala:
+Quien tiene el proyecto abre la sala. Se le puede pasar una carpeta entera:
+
+```sh
+chakai share ecos "Ecos de la Pacha/tema_principal Project"
+```
+
+O archivos sueltos, si es lo que hace falta:
 
 ```sh
 chakai share zamba-nueva bajo-toma3.wav partitura.pdf
@@ -36,7 +46,9 @@ Los demás lo bajan:
 chakai join <codigo> ./mis-descargas
 ```
 
-Los archivos aparecen en la carpeta. Y quien los bajó queda también compartiendo, así que cuantos más son, mejor anda.
+La carpeta del proyecto se reconstruye igual del otro lado, subdirectorios incluidos: se abre en el DAW y listo. Y quien lo bajó queda también compartiendo, así que cuantos más son, mejor anda.
+
+Probado con un proyecto real de Ableton Live: 11 archivos entre `Backup/`, `Samples/` y `Ableton Project Info/`, todos verificados idénticos byte a byte del otro lado.
 
 ## Instalación
 
