@@ -46,6 +46,12 @@ pear install pear://ipuh57fdpuh5fxcc7533g67wttmxb8ajhobbykzd5z8cfdtcepwo
 
 No hay descarga desde una web ni app store: el binario viaja por la misma red P2P. Las actualizaciones también — si publicamos una versión nueva, te llega sola.
 
+Para reinstalar sobre una versión existente hay que borrarla primero (`pear install` no pisa lo que ya está):
+
+```sh
+rm ~/.local/bin/chakai && pear install pear://ipuh57fdpuh5fxcc7533g67wttmxb8ajhobbykzd5z8cfdtcepwo
+```
+
 ## Cómo está hecho
 
 Construido sobre el stack de Holepunch, partiendo del template oficial [`hello-pear-bare`](https://github.com/holepunchto/hello-pear-bare), **variante `main`** (el updater corre en un worker thread, que es lo indicado para un programa que queda abierto).
@@ -70,6 +76,18 @@ El código que se comparte es la clave pública del drive. El swarm se une a la 
 - Windows x64
 - macOS Apple Silicon (arm64)
 - macOS Intel (x64)
+
+### Cuándo se buscan actualizaciones
+
+El updater mantiene su estado en un Corestore con lock exclusivo: dos procesos no pueden tenerlo abierto a la vez. Como tener varias salas abiertas al mismo tiempo (una por canción) es el uso normal, el updater corre **solo en la invocación sin comando**:
+
+```sh
+chakai          # busca actualizaciones y muestra la ayuda
+chakai share …  # mueve archivos, sin updater
+chakai join …   # ídem
+```
+
+Así nunca compiten por el lock. Sin esto, la segunda ventana abortaba con `Corestore is closed`, lanzado de forma asíncrona desde su worker — un error que ningún `try/catch` del hilo principal puede atrapar.
 
 ## Límites, dicho de frente
 
