@@ -107,7 +107,8 @@ try {
   await app.ready()
 
   if (action === null) {
-    console.log('\n  chakai share <sala> [archivos...]   compartir con la banda')
+    console.log(`\n🎵 Chakai v${pkg.version} — stems y partituras entre la banda, sin servidor\n`)
+    console.log('  chakai share <sala> [archivos...]   compartir con la banda')
     console.log('  chakai join <codigo> [carpeta]     descargar de una sala\n')
   } else if (action.type === 'share') {
     room = await openRoom({ storageDir: path.join(dir, 'rooms', action.room) })
