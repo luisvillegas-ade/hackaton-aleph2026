@@ -1,7 +1,7 @@
 {
   "name": "chakai",
-  "version": "0.3.0",
-  "description": "Compartí stems y partituras con tu banda, sin servidor y sin que venza el link.",
+  "version": "0.3.1",
+  "description": "Control de versiones y sincronización para proyectos musicales, sin servidor.",
   "private": true,
   "bin": "bin.mjs",
   "upgrade": "pear://ipuh57fdpuh5fxcc7533g67wttmxb8ajhobbykzd5z8cfdtcepwo",

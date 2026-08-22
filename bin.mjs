@@ -164,9 +164,11 @@ if (app !== null) await app.ready()
 try {
   if (action === null) {
     ui.printLogo()
-    ui.printInfo(`Chakai v${pkg.version} — stems y partituras entre la banda, sin servidor\n`)
-    ui.printMuted('  chakai share <sala> [archivos...]   compartir con la banda')
-    ui.printMuted('  chakai join <codigo> [carpeta]     descargar de una sala\n')
+    ui.printInfo(`Chakai v${pkg.version} — control de versiones para proyectos musicales\n`)
+    ui.printMuted('  chakai share <sala> <carpeta>          compartir y vigilar cambios')
+    ui.printMuted('  chakai join <codigo> [carpeta]         bajar y quedar sincronizado')
+    ui.printMuted('  chakai log <sala>                      ver el historial de tomas')
+    ui.printMuted('  chakai restore <sala> <toma> [dest]    volver a una toma anterior\n')
   } else if (action.type === 'share') {
     room = await openRoom({ storageDir: path.join(dir, 'rooms', action.room) })
 
