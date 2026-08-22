@@ -17,7 +17,9 @@ import {
   downloadAll,
   humanSize
 } from './lib/room.js'
-import { watchFolder } from './lib/watch.js'
+import { watchFolder, scan } from './lib/watch.js'
+import { newSessionCode, openSession, closeSession } from './lib/session.js'
+import { applyPeer, publishLocal } from './lib/sync.js'
 import { readHistory, appendTake, restoreTake, formatDate } from './lib/versions.js'
 import ui from './lib/ui.js'
 
@@ -81,12 +83,27 @@ const restoreCmd = command(
   }
 )
 
+const openCmd = command(
+  'open',
+  summary('Trabajar en equipo: todos escriben, todos reciben'),
+  arg('<carpeta>', 'la carpeta del proyecto'),
+  arg('[codigo]', 'código de una sesión existente; sin él se crea una nueva'),
+  () => {
+    action = {
+      type: 'open',
+      folder: openCmd.args.carpeta,
+      code: openCmd.args.codigo || null
+    }
+  }
+)
+
 const cmd = command(
   appName,
   summary(pkg.description),
   flag('--version|-v', 'Print the current version'),
   flag('--storage <dir>', 'custom storage directory'),
   flag('--no-updates', 'disable OTA updates for this run'),
+  openCmd,
   shareCmd,
   joinCmd,
   logCmd,
@@ -140,8 +157,9 @@ if (app !== null) {
 }
 
 let room = null
+let session = null
 
-// Al salir hay que cerrar swarm y drive además del updater: si no, quedan
+// Al salir hay que cerrar swarm y drives además del updater: si no, quedan
 // conexiones abiertas y el proceso no termina.
 async function shutdown(code) {
   if (room !== null) {
@@ -149,6 +167,11 @@ async function shutdown(code) {
     room = null
     await r.swarm.destroy().catch(() => {})
     await r.drive.close().catch(() => {})
+  }
+  if (session !== null) {
+    const s = session
+    session = null
+    await closeSession(s)
   }
   if (app !== null) await app.exit(code)
   else Bare.exit(code)
@@ -165,10 +188,78 @@ try {
   if (action === null) {
     ui.printLogo()
     ui.printInfo(`Chakai v${pkg.version} — control de versiones para proyectos musicales\n`)
+    ui.printMuted('  chakai open <carpeta> [codigo]         TRABAJO EN EQUIPO: todos escriben')
+    console.log('')
     ui.printMuted('  chakai share <sala> <carpeta>          compartir y vigilar cambios')
     ui.printMuted('  chakai join <codigo> [carpeta]         bajar y quedar sincronizado')
     ui.printMuted('  chakai log <sala>                      ver el historial de tomas')
     ui.printMuted('  chakai restore <sala> <toma> [dest]    volver a una toma anterior\n')
+  } else if (action.type === 'open') {
+    const code = action.code || newSessionCode()
+    const folder = action.folder.replace(/[/\\]+$/, '')
+
+    session = await openSession({
+      storageDir: path.join(dir, 'sesiones', code.slice(0, 16)),
+      code,
+      onPeer: (hex, total) => ui.printSuccess(`se sumó ${hex.slice(0, 8)} (${total} en la sala)`)
+    })
+
+    // Publicar lo que ya hay en la carpeta
+    const inicial = await scan(folder)
+    const subidos = await publishLocal(session.mine, folder, [...inicial.keys()])
+    for (const f of subidos) ui.printSuccess(`+ ${f.rel} (${humanSize(f.size)})`)
+
+    console.log('')
+    if (action.code) {
+      ui.printInfo(`Sesión abierta — ${subidos.length} archivo(s) tuyos publicados\n`)
+    } else {
+      ui.printInfo(`Sesión nueva — ${subidos.length} archivo(s) publicados\n`)
+      ui.printMuted('Pasale este código a la banda:')
+      ui.printFrame(code)
+      ui.printMuted('Ellos entran con:  chakai open <su-carpeta> <codigo>')
+      console.log('')
+    }
+
+    // Lo que yo guardo se publica en MI drive
+    watchFolder(folder, {
+      onSnapshot: async ({ changed }) => {
+        const pub = await publishLocal(session.mine, folder, changed)
+        if (pub.length === 0) return
+        for (const f of pub) ui.printSuccess(`↑ ${f.rel} (${humanSize(f.size)})`)
+        const take = await appendTake(session.mine, { files: pub.map((f) => f.rel) })
+        ui.printInfo(`toma #${take.n} publicada\n`)
+      }
+    })
+
+    // Lo que guardan los demás baja y se resuelve sobre mi carpeta
+    const vistos = new Map()
+    setInterval(async () => {
+      for (const [hex, drive] of session.peers) {
+        try {
+          await drive.update({ wait: true })
+          if (vistos.get(hex) === drive.version) continue
+          vistos.set(hex, drive.version)
+
+          await applyPeer(drive, folder, {
+            peerLabel: hex.slice(0, 6),
+            onEvent: (e) => {
+              if (e.action === 'nuevo') ui.printSuccess(`↓ ${e.rel} (${humanSize(e.size)})`)
+              else if (e.action === 'fusionado') {
+                ui.printInfo(`⇉ ${e.rel} — ${e.added} pista(s) sumada(s)`)
+                if (e.conflicts > 0) {
+                  ui.printMuted(`   ${e.conflicts} pista(s) tocadas por los dos: se conservó la tuya`)
+                }
+              } else if (e.action === 'copia') ui.printMuted(`   guardado aparte: ${e.rel}`)
+              else if (e.action === 'error-fusion') ui.printError(`no se pudo fusionar ${e.rel}`)
+            }
+          })
+        } catch {
+          // un par caído no corta la sesión
+        }
+      }
+    }, 4000)
+
+    ui.printInfo('Trabajando en equipo. Lo que guardes se publica solo. Ctrl+C para salir.\n')
   } else if (action.type === 'share') {
     room = await openRoom({ storageDir: path.join(dir, 'rooms', action.room) })
 
