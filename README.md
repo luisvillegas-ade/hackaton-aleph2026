@@ -1,6 +1,6 @@
 # Chakai
 
-> Control de versiones y colaboración para proyectos musicales. Como git, pero para Reaper y Ableton — y sin servidor.
+> Control de versiones y colaboración para proyectos musicales. Como git, pero para tu DAW — y sin servidor.
 
 Aleph Hackathon 2026 — chapter Salta · **Pears Track** + **General Track**
 
@@ -20,7 +20,25 @@ Chakai resuelve las dos: manda la carpeta completa con su estructura intacta, y 
 
 ## Cómo se usa
 
-Abrís la sala con la carpeta del proyecto:
+Todos los músicos abren el mismo proyecto. No hay un rol privilegiado: **cualquiera graba y todos reciben.**
+
+El primero abre la sesión con su carpeta:
+
+```sh
+chakai open "Beto Prueba"
+```
+
+Eso imprime un código. El resto entra con él, cada uno apuntando a su propia copia:
+
+```sh
+chakai open "mi Beto Prueba" <codigo>
+```
+
+A partir de ahí cada uno trabaja en su DAW como siempre. Cuando guardás, Chakai publica los cambios solo, y los del resto aparecen en tu proyecto. **Si dos graban pistas distintas al mismo tiempo, el proyecto termina con las dos**: los `.rpp` se fusionan por pista, no se pisan.
+
+### Modo distribución (uno a muchos)
+
+Si en cambio querés repartir un proyecto sin que los demás escriban — mandarle los stems a la banda para que los escuchen — está `share`:
 
 ```sh
 chakai share ecos "Ecos de la Pacha/tema_principal Project"
@@ -117,7 +135,7 @@ Construido sobre el stack de Holepunch, partiendo del template oficial [`hello-p
 
 El control de versiones no se construyó desde cero: Hypercore, que está debajo de Hyperdrive, es un registro de solo-agregado. Cada escritura deja la anterior intacta y accesible. Chakai expone eso en términos que un músico entiende.
 
-Código relevante: [`lib/room.js`](lib/room.js) (replicación y archivos), [`lib/watch.js`](lib/watch.js) (detección de cambios), [`lib/versions.js`](lib/versions.js) (historial de tomas) y [`bin.mjs`](bin.mjs) (comandos).
+Código relevante: [`lib/session.js`](lib/session.js) (sesión multi-escritura e intercambio de claves), [`lib/sync.js`](lib/sync.js) (unión de los drives sobre la carpeta local), [`lib/rpp.js`](lib/rpp.js) (fusión por pista), [`lib/watch.js`](lib/watch.js) (detección de cambios), [`lib/versions.js`](lib/versions.js) (historial de tomas) y [`bin.mjs`](bin.mjs) (comandos).
 
 ### Por qué "tomas" y no versiones del drive
 
