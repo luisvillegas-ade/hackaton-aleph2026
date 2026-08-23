@@ -1,54 +1,58 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guía para trabajar sobre este repositorio con asistentes de código.
 
-## Project
+## Proyecto
 
-`hello-pear-bare` — Holepunch boilerplate for a **Bare** (not Node.js) CLI that embeds `pear-runtime` in a Bare worker to get peer-to-peer OTA updates, and ships as a standalone per-platform binary via `bare-build`.
+**Chakai** — control de versiones y colaboración para proyectos musicales, sin servidor. Varios músicos abren el mismo proyecto de DAW, cada uno graba lo suyo, y los aportes se fusionan a nivel de pista.
 
-## Commands
+Construido sobre el stack de Holepunch, partiendo del template `hello-pear-bare` (variante `main`).
+
+## Lo primero que hay que saber
+
+**Bare no es Node.js.** No existen `fs`, `path` ni `process` de Node: se usan `bare-fs`, `bare-path`, `bare-process`. Cualquier paquete de npm puede no funcionar. Antes de usar una API, verificarla contra el paquete instalado en `node_modules`, no de memoria — el código con métodos inventados es el error más caro acá.
+
+## Comandos
 
 ```sh
-npm start              # bare bin.mjs --no-updates (dev; updates off so local binaries aren't swapped)
-npm start -- --updates # dev run with the OTA updater enabled
-npm test               # brittle-bare test/index.js
-npm run lint           # prettier --check && lunte
-npm run format         # prettier --write
-npm run make           # detect host platform-arch, delegate to make:<host>
-npm run make:win32-x64 # (and darwin/linux × arm64/x64) -> out/<host>/
+npm start -- open <carpeta> [codigo]   # sesión colaborativa
+npm start -- share <sala> <carpeta>    # distribución de uno a muchos
+npm start -- join <codigo> [carpeta]   # recibir y sincronizar
+npm start -- log <sala>                # historial de tomas
+npm start -- restore <sala> <toma>     # volver a una toma anterior
+
+npm run make                           # binario del sistema actual
+npm run make:win32-x64                 # o una plataforma específica
 ```
 
-Run a single test with brittle's filter: `npx brittle-bare test/index.js -s "<test name>"`.
-Tests execute under the Bare runtime (`brittle-bare`), not Node — `brittle` (Node) will not have the `Bare` global.
+## Arquitectura
 
-`npm start` fails with `INVALID_URL` until `package.json`'s `upgrade` field holds a real `pear://` link (`pear touch` generates one). The placeholder is `pear://<YOUR_KEY_HERE>`.
+| Archivo | Responsabilidad |
+|---|---|
+| `bin.mjs` | Comandos y orquestación |
+| `lib/session.js` | Sesión multi-escritura: un drive por músico, intercambio de claves por protomux |
+| `lib/sync.js` | Resuelve la unión de todos los drives sobre la carpeta local |
+| `lib/rpp.js` | Fusión de proyectos Reaper por pista (GUID) |
+| `lib/room.js` | Replicación y archivos (modo `share`/`join`) |
+| `lib/watch.js` | Detección de cambios por sondeo, con espera de calma |
+| `lib/versions.js` | Historial de tomas |
+| `lib/ui.js`, `lib/tui.js` | Salida por terminal |
+| `workers/main.js` | Una línea: `require('hello-pear-worker')`, el updater OTA |
 
-## Runtime rules
+### Decisiones que conviene no revertir sin entender
 
-- Application code runs in **Bare**, so use the `bare-*` shims (`bare-os`, `bare-path`, `bare-process`, `bare-storage`) — never Node core modules. The `Bare` global supplies `Bare.argv`, `Bare.IPC`, `Bare.exit()`, `Bare.exitCode`.
-- Mixed module systems on purpose: `bin.mjs` is ESM (and imports `package.json` directly); `app.js` and `workers/main.js` are CJS. `scripts/make.js` is the only file that runs under **Node**, so it uses Node builtins.
-- `bin.mjs` decides dev vs. standalone by checking whether `Bare.argv[0]` is the `bare`/`bare.exe` binary. That flag drives three things: the argv slice offset (`slice(2)` in dev, `slice(1)` when standalone), the storage dir (tmp in dev, `bare-storage` persistent dir otherwise), and whether the running executable path is handed to the updater. Changing the launch shape means revisiting all three.
+- **Un drive por músico.** Nadie escribe donde escribe otro, así que los conflictos de escritura son imposibles por diseño. La unión se resuelve al escribir en disco.
+- **El updater corre solo en la invocación sin comando.** Toma un lock exclusivo sobre su Corestore; si dos ventanas lo levantan, la segunda aborta con `Corestore is closed` desde su worker — un error asincrónico de otro hilo que ningún `try/catch` atrapa.
+- **La fusión de `.rpp` va sobre el mismo archivo**, no en una copia al lado. Una copia partía el proyecto en dos y el músico terminaba trabajando sobre un archivo que se le sobrescribía.
+- **Detección de cambios por sondeo**, no `fs.watch` (incierto en Bare). Se espera un ciclo sin movimiento antes de cerrar una toma, porque los DAW guardan en ráfagas.
 
-## Architecture
+## Publicar una versión
 
-`bin.mjs` (CLI, arg parsing via `paparam`, logging, signal handling)
- → `app.js` `App extends ReadyResource` (`_open` spawns, `_close` tears down)
- → `PearRuntime.run('workers/main.js', [...])` — a Bare worker
- → `workers/main.js` is a one-liner: `require('hello-pear-worker')`.
+La copia de deploy no debe usar `git pull` (el `npm install` de cada plataforma modifica `package-lock.json` y lo bloquea en silencio):
 
-The actual backend (Hyperswarm + Corestore + `pear-runtime` updater) lives in the **`hello-pear-worker` npm dependency**, not in this repo. That module is shared with mobile and desktop parents, so behavior changes to networking/storage/updates belong upstream in `holepunchto/hello-pear-worker`; this repo owns only the CLI parent.
+```sh
+git fetch origin main && git reset --hard origin/main
+node -p "require('./package.json').version"   # verificar ANTES de compilar
+```
 
-### Worker contract
-
-Two coupled pieces to keep in sync when touching either side:
-
-1. **Positional argv.** `App._open` passes `[updates, version, upgrade, name, dir, app]` as strings; the worker reads them by index (with an offset for BareKit/mobile, where `argv[0]`/`argv[1]` are absent). Order is the whole protocol — an inserted argument silently shifts everything.
-2. **Framed string IPC** (`framed-stream` over `Bare.IPC`). Worker→parent: `updating`, `updated`, `pear:updateApplied`; anything else is re-emitted as `App`'s `message` event. Parent→worker: `pear:applyUpdate`, which `app.js` sends automatically on `updated`.
-
-`App` re-emits the lifecycle as events (`message`, `updating`, `updated`, `update-applied`, `error`); `bin.mjs` only logs them.
-
-## Conventions
-
-- Prettier with `prettier-config-holepunch` (no semicolons, single quotes, 2-space, 100 cols) plus `lunte`. Run `npm run format` before committing; CI runs `npm run lint`.
-- `.gitattributes` forces LF — do not commit CRLF.
-- `out/` and `dist/` are build output and gitignored.
+Después compilar las seis plataformas, `pear build` y `pear stage`. El `pear seed` tiene que estar corriendo para que alguien pueda instalar.
