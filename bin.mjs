@@ -23,6 +23,7 @@ import sessionCrypto from 'hypercore-crypto'
 import { applyPeer, publishLocal } from './lib/sync.js'
 import { readHistory, appendTake, restoreTake, formatDate } from './lib/versions.js'
 import ui from './lib/ui.js'
+import tui from './lib/tui.js'
 
 const appName = pkg.productName || pkg.name
 const isDev = path.basename(Bare.argv[0]) === (isWindows ? 'bare.exe' : 'bare')
@@ -199,48 +200,108 @@ try {
     const code = action.code || newSessionCode()
     const folder = action.folder.replace(/[/\\]+$/, '')
 
-    // El almacenamiento se deriva del código Y de la carpeta local. Si solo
-    // dependiera del código, dos ventanas de la misma máquina en la misma
-    // sesión chocarían por el lock — que es exactamente el caso de una demo
-    // o de alguien participando desde dos proyectos distintos.
     const slot = sessionCrypto.data(Buffer.from(code + '|' + folder)).toString('hex').slice(0, 16)
+
+    const tuiLogs = []
+    let tuiPeersCount = 1
+    function addLog(msg) {
+      tuiLogs.push(msg)
+      if (tuiLogs.length > 8) tuiLogs.shift()
+      renderActivity()
+    }
+    
+    function renderActivity() {
+      tui.renderDashboard(
+        `[ PEARS AUDIO SYNC ] | ROLE: PRODUCER | NODE: ONLINE (${tuiPeersCount} PEERS)`,
+        tuiLogs.join('\n'),
+        ['[R] Refresh Log', '[B] Browse Performer Repositories', '[Ctrl+C] Exit']
+      )
+    }
+
+    tui.setGlobalKeyHandler(async (key) => {
+      if (key === 'r') renderActivity()
+      else if (key === 'b') {
+        const peers = Array.from(session.peers.entries())
+        if (peers.length === 0) {
+          tuiLogs.push(`[${new Date().toLocaleTimeString()}] WARNING: No peers connected yet.`)
+          renderActivity()
+          return
+        }
+        
+        let allFiles = []
+        for (const [hex, drive] of peers) {
+          const files = await listFiles(drive)
+          files.forEach(f => {
+            allFiles.push({
+              label: `[Peer ${hex.slice(0,6)}] /${f.name}`,
+              value: { hex, name: f.name }
+            })
+          })
+        }
+        
+        if (allFiles.length === 0) {
+          tuiLogs.push(`[${new Date().toLocaleTimeString()}] WARNING: No files found in peer repositories.`)
+          renderActivity()
+          return
+        }
+        
+        const selection = await tui.promptSelect('[ PEARS AUDIO SYNC ] | REPOSITORY EXPLORER', allFiles)
+        if (selection) {
+          const peerDrive = session.peers.get(selection.hex)
+          const data = await peerDrive.get('/' + selection.name)
+          const dest = path.join(folder, 'Samples', 'Imported', path.basename(selection.name))
+          await fs.promises.mkdir(path.dirname(dest), { recursive: true })
+          await fs.promises.writeFile(dest, data)
+          tuiLogs.push(`[${new Date().toLocaleTimeString()}] SUCCESS: Imported ${selection.name} to /Samples/`)
+        }
+        renderActivity()
+      }
+    })
 
     session = await openSession({
       storageDir: path.join(dir, 'sesiones', slot),
       code,
-      onPeer: (hex, total) => ui.printSuccess(`se sumó ${hex.slice(0, 8)} (${total} en la sala)`)
+      onPeer: (hex, total) => {
+        tuiPeersCount = total
+        addLog(`[${new Date().toLocaleTimeString()}] INCOMING: Connection from [Node: ${hex.slice(0, 6)}]`)
+      }
     })
 
-    // Publicar lo que ya hay en la carpeta
     const inicial = await scan(folder)
     const subidos = await publishLocal(session.mine, folder, [...inicial.keys()])
-    for (const f of subidos) ui.printSuccess(`+ ${f.rel} (${humanSize(f.size)})`)
-
-    console.log('')
-    ui.printPath('carpeta:', folder)
-    console.log('')
-    if (action.code) {
-      ui.printInfo(`Sesión abierta — ${subidos.length} archivo(s) tuyos publicados\n`)
-    } else {
-      ui.printInfo(`Sesión nueva — ${subidos.length} archivo(s) publicados\n`)
-      ui.printMuted('Pasale este código a la banda:')
-      ui.printFrame(code)
-      ui.printMuted('Ellos entran con:  chakai open <su-carpeta> <codigo>')
-      console.log('')
+    
+    tui.startGlobalListener()
+    addLog(`[${new Date().toLocaleTimeString()}] SYSTEM: Session open. Project: ${folder}`)
+    if (!action.code) {
+      addLog(`[${new Date().toLocaleTimeString()}] SYSTEM: Share this code: ${code}`)
     }
 
-    // Lo que yo guardo se publica en MI drive
+    // Producer step 1: prompt before push
     watchFolder(folder, {
       onSnapshot: async ({ changed }) => {
         const pub = await publishLocal(session.mine, folder, changed)
         if (pub.length === 0) return
-        for (const f of pub) ui.printSuccess(`↑ ${f.rel} (${humanSize(f.size)})`)
-        const take = await appendTake(session.mine, { files: pub.map((f) => f.rel) })
-        ui.printInfo(`toma #${take.n} publicada\n`)
+        
+        const details = []
+        details.push(`PROJECT: ${folder}`)
+        details.push(`PENDING CHANGES DETECTED:`)
+        pub.forEach(f => details.push(`> Modified/New: ${f.rel}`))
+        
+        const confirm = await tui.promptConfirm(
+          `[ PEARS AUDIO SYNC ] | ROLE: PRODUCER | NODE: ONLINE (${tuiPeersCount} PEERS)`,
+          `Commit changes and broadcast to performers?`,
+          details
+        )
+        
+        if (confirm) {
+          const take = await appendTake(session.mine, { files: pub.map((f) => f.rel) })
+          addLog(`[${new Date().toLocaleTimeString()}] SUCCESS: Version ${take.n} synced to Pears node.`)
+        } else {
+          addLog(`[${new Date().toLocaleTimeString()}] CANCELLED: Push aborted by Producer.`)
+        }
       }
     })
 
-    // Lo que guardan los demás baja y se resuelve sobre mi carpeta
     const vistos = new Map()
     setInterval(async () => {
       for (const [hex, drive] of session.peers) {
@@ -252,26 +313,21 @@ try {
           await applyPeer(drive, folder, {
             peerLabel: hex.slice(0, 6),
             onEvent: (e) => {
-              if (e.action === 'nuevo') ui.printSuccess(`↓ ${e.rel} (${humanSize(e.size)})`)
-              else if (e.action === 'fusionado') {
-                ui.printInfo(`⇉ ${e.rel} — ${e.added} pista(s) sumada(s)`)
-                if (e.conflicts > 0) {
-                  ui.printMuted(`   ${e.conflicts} pista(s) tocadas por los dos: se conservó la tuya`)
-                }
-                // Es el archivo que el músico va a querer abrir: se muestra
-                // en el formato que puede pegar en Reaper sin traducirlo.
-                ui.printPath('abrilo en:', path.join(folder, ...e.rel.split('/')))
-              } else if (e.action === 'copia') ui.printMuted(`   guardado aparte: ${e.rel}`)
-              else if (e.action === 'error-fusion') ui.printError(`no se pudo fusionar ${e.rel}`)
+              if (e.action === 'nuevo') {
+                addLog(`[${new Date().toLocaleTimeString()}] AUTO-ROUTING STATUS:`)
+                addLog(` └─ ${e.rel} -> /Samples/ (SUCCESS)`)
+              } else if (e.action === 'fusionado') {
+                addLog(`[${new Date().toLocaleTimeString()}] AUTO-ROUTING STATUS:`)
+                addLog(` └─ ${e.rel} -> Merged successfully.`)
+              } else if (e.action === 'copia') {
+                addLog(`[${new Date().toLocaleTimeString()}] AUTO-ROUTING STATUS: Copied ${e.rel}`)
+              }
             }
           })
-        } catch {
-          // un par caído no corta la sesión
-        }
+        } catch { }
       }
     }, 4000)
 
-    ui.printInfo('Trabajando en equipo. Lo que guardes se publica solo. Ctrl+C para salir.\n')
   } else if (action.type === 'share') {
     room = await openRoom({ storageDir: path.join(dir, 'rooms', action.room) })
 

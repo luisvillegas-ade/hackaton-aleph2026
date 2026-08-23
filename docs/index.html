@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Chakai - Control de versiones musical P2P</title>
+  <meta name="description" content="Control de versiones y colaboración para proyectos musicales. Como git, pero para Reaper y Ableton — y sin servidor.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="cursor-beam" aria-hidden="true" data-cursor-beam></div>
+
+  <header class="site-header">
+    <a class="navbar__logo" href="#top">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+      Chakai
+    </a>
+    <nav class="navbar__links">
+      <a href="#problema">El problema</a>
+      <a href="#uso">Cómo se usa</a>
+      <a href="#instalacion">Instalación</a>
+      <a href="#arquitectura">Cómo está hecho</a>
+    </nav>
+    <div class="navbar__ctas">
+      <span class="badge">Aleph Hackathon 2026</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" id="top">
+      <h1 class="hero__title">Música en equipo,<br>sin servidor en el medio.</h1>
+      <p class="hero__desc">Control de versiones y colaboración para proyectos musicales. Como git, pero para Reaper y Ableton. <strong>Dos músicos graban pistas distintas al mismo tiempo, sin pisarse.</strong></p>
+      
+      <div class="hero__ctas">
+        <a class="btn btn--green" href="#instalacion">Instalar Chakai</a>
+        <a class="btn btn--ghost" href="https://github.com/luisvillegas-ade/hackaton-aleph2026" target="_blank">Ver en GitHub</a>
+      </div>
+
+      <div class="terminal">
+        <div style="margin-bottom: 0.5rem; color: var(--border-color);"># Instalar vía Holepunch Pear</div>
+        <div><span class="cmd">$</span> pear install pear://ipuh57fdpuh...</div>
+      </div>
+    </section>
+
+    <section id="problema" class="section">
+      <div class="wrap prose">
+        <h2 class="section__title">El problema</h2>
+        <p>Una banda graba en estudios caseros distintos, y hoy se pasa el trabajo por WhatsApp (que comprime el audio), WeTransfer (que vence a los 7 días) o Drive (que se llena). Todos tienen un servidor de una empresa en el medio, que cuesta plata y decide cuánto dura tu música.</p>
+        <p>Pero el problema de fondo es otro, y es doble:</p>
+        
+        <div class="callout">
+          <p class="callout__title">1. Un proyecto de DAW no es un archivo</p>
+          <p>Un proyecto de Ableton Live o Reaper es un árbol de carpetas — el <code>.als</code>, <code>Samples/</code>, <code>Ableton Project Info/</code> — y si la estructura se pierde, el proyecto no abre. Por eso se termina comprimiendo todo en un ZIP y subiéndolo entero cada vez que cambian dos compases.</p>
+        </div>
+
+        <div class="callout">
+          <p class="callout__title">2. No hay historial</p>
+          <p>El programador tiene git desde hace veinte años: puede volver a como estaba ayer, ver qué cambió, recuperar lo que rompió. El músico tiene <code>mezcla_final_v3_ESTA_SI.als</code> y un <code>Backup/</code> que nadie entiende. Si a las dos de la mañana arruinás la mezcla, no hay vuelta atrás.</p>
+        </div>
+
+        <p><strong>Chakai resuelve las dos:</strong> manda la carpeta completa con su estructura intacta, y le pone un historial de versiones que viaja con el proyecto. Hyperdrive transfiere solo los bloques que cambiaron. Si editás dos compases de un proyecto de 2 GB, viaja la diferencia, no los 2 GB.</p>
+      </div>
+    </section>
+
+    <section id="uso" class="section">
+      <div class="wrap prose">
+        <h2 class="section__title">Cómo se usa</h2>
+        
+        <h3>Abrir la sala</h3>
+        <p>Abrís la sala con la carpeta del proyecto:</p>
+        <pre><code>chakai share ecos "Ecos de la Pacha/tema_principal Project"</code></pre>
+        <p>Eso comparte <strong>y se queda vigilando</strong>. Cada vez que guardás en el DAW, Chakai registra una <em>toma</em> nueva solo — no hay que acordarse de nada. Espera a que la escritura se calme antes de guardar, así una ráfaga de autoguardado no genera treinta versiones basura.</p>
+        <p>Te imprime un código. Se lo pasás a la banda una sola vez, y no volvés a mandar archivos nunca más.</p>
+
+        <h3>Unirse a la sala</h3>
+        <p>Los demás entran:</p>
+        <pre><code>chakai join &lt;codigo&gt; ./mis-proyectos</code></pre>
+        <p>El proyecto se reconstruye igual del otro lado, subdirectorios incluidos: se abre en el DAW y listo. Y queda <strong>sincronizando</strong>: cuando vos guardás una toma nueva, les llega sola.</p>
+
+        <h3>El historial</h3>
+        <pre><code>chakai log ecos
+
+Historial de "ecos" — 2 toma(s)
+
+#2  2026-08-22 18:46
+     ~ Ecos Project/tema.als
+     ~ Ecos Project/Samples/bajo.wav
+#1  2026-08-22 18:45
+     ~ Ecos Project/tema.als
+     ~ Ecos Project/Samples/bombo.wav</code></pre>
+        <p>Y cuando rompiste la mezcla:</p>
+        <pre><code>chakai restore ecos 1</code></pre>
+        <p>El historial vive <strong>dentro del proyecto</strong>, así que no es un registro local tuyo: cuando un compañero se une, recibe también toda la historia de tomas.</p>
+      </div>
+    </section>
+
+    <section id="instalacion" class="section">
+      <div class="wrap prose">
+        <h2 class="section__title">Instalación</h2>
+        <p>No hay descarga desde una web ni app store: el binario viaja por la misma red P2P. Las actualizaciones también — si publicamos una versión nueva, te llega sola.</p>
+        <pre><code>pear install pear://ipuh57fdpuh5fxcc7533g67wttmxb8ajhobbykzd5z8cfdtcepwo</code></pre>
+        <p>Para reinstalar sobre una versión existente hay que borrarla primero (<code>pear install</code> no pisa lo que ya está):</p>
+        <pre><code>rm ~/.local/bin/chakai && pear install pear://ipuh57fdpuh5fxcc7533g67wttmxb8ajhobbykzd5z8cfdtcepwo</code></pre>
+        
+        <h3>Comandos Disponibles</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Comando</th>
+              <th>Qué hace</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>chakai share &lt;sala&gt; &lt;carpeta&gt;</code></td>
+              <td>Comparte el proyecto y vigila los cambios, registrando tomas</td>
+            </tr>
+            <tr>
+              <td><code>chakai join &lt;codigo&gt; [carpeta]</code></td>
+              <td>Descarga el proyecto y queda sincronizando</td>
+            </tr>
+            <tr>
+              <td><code>chakai log &lt;sala&gt;</code></td>
+              <td>Historial de tomas, con fecha y qué cambió</td>
+            </tr>
+            <tr>
+              <td><code>chakai restore &lt;sala&gt; &lt;toma&gt; [carpeta]</code></td>
+              <td>Recupera el proyecto como estaba en esa toma</td>
+            </tr>
+            <tr>
+              <td><code>chakai</code></td>
+              <td>Muestra la ayuda y busca actualizaciones</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="arquitectura" class="section">
+      <div class="wrap prose">
+        <h2 class="section__title">Cómo está hecho</h2>
+        <p>Construido sobre el stack de Holepunch, partiendo del template oficial <code>hello-pear-bare</code>, <strong>variante main</strong> (el updater corre en un worker thread, que es lo indicado para un programa que queda abierto).</p>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>Pieza</th>
+              <th>Para qué</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Hyperdrive</strong></td>
+              <td>El sistema de archivos que se replica entre pares. Una sala = un drive. Su historial de versiones (version, checkout, diff) es lo que hace posible log y restore.</td>
+            </tr>
+            <tr>
+              <td><strong>Corestore</strong></td>
+              <td>Guarda los datos del drive en disco.</td>
+            </tr>
+            <tr>
+              <td><strong>Hyperswarm</strong></td>
+              <td>Encuentra a los otros músicos. Se une a la discoveryKey, que es un hash de la clave pública — así, alguien que mire la red no puede deducir el código de la sala.</td>
+            </tr>
+            <tr>
+              <td><strong>Bare</strong></td>
+              <td>El runtime. Compila a un binario por sistema operativo, sin necesidad de instalar Node.</td>
+            </tr>
+            <tr>
+              <td><strong>pear-runtime</strong></td>
+              <td>Las actualizaciones over-the-air, peer-to-peer.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Límites, dicho de frente</h3>
+        <ul>
+          <li><strong>Es de un solo escritor.</strong> Quien abre la sala es el que puede agregar archivos y registrar tomas. Hoy el modelo es el de un estudio: alguien lleva la sesión, el resto la sigue.</li>
+          <li><strong>Alguien tiene que estar en línea.</strong> Es inherente al P2P. No reemplazamos el servidor por nada, lo reemplazamos por las computadoras de la propia banda.</li>
+          <li><strong>Los archivos se cargan enteros en memoria</strong> al subir y bajar. Anda bien con stems normales; para sesiones de varios GB habría que pasar a streams.</li>
+          <li><strong><code>restore</code> escribe en una carpeta aparte</strong>, no pisa el proyecto original. Preferimos que el músico compare y decida antes de sobrescribir su sesión.</li>
+          <li><strong>La detección de cambios es por sondeo</strong>, cada 3 segundos. Para el ritmo de trabajo de una sesión de música es de sobra, pero no es instantáneo.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Chakai — Aleph Hackathon 2026, Salta. Pears Track + General Track.</p>
+  </footer>
+
+  <script>
+    // Cursor beam logic
+    const cursor = document.querySelector('[data-cursor-beam]');
+    const canHover = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    if (cursor && canHover.matches && !prefersReducedMotion.matches) {
+      let mouseX = window.innerWidth / 2;
+      let mouseY = window.innerHeight / 2;
+      let targetX = mouseX;
+      let targetY = mouseY;
+      let isAnimating = false;
+
+      const animate = () => {
+        mouseX += (targetX - mouseX) * 0.22;
+        mouseY += (targetY - mouseY) * 0.22;
+        cursor.style.transform = `translate3d(${mouseX}px, ${mouseY}px, 0)`;
+
+        if (Math.abs(targetX - mouseX) > 0.15 || Math.abs(targetY - mouseY) > 0.15) {
+          requestAnimationFrame(animate);
+        } else {
+          isAnimating = false;
+        }
+      };
+
+      window.addEventListener('pointermove', (e) => {
+        if (e.pointerType === 'mouse') {
+          targetX = e.clientX;
+          targetY = e.clientY;
+          cursor.classList.add('is-on');
+          if (!isAnimating) {
+            isAnimating = true;
+            requestAnimationFrame(animate);
+          }
+        }
+      }, { passive: true });
+    }
+    
+    // Smooth scrolling for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        document.querySelector(this.getAttribute('href')).scrollIntoView({
+          behavior: 'smooth'
+        });
+      });
+    });
+  </script>
+</body>
+</html>

@@ -74,10 +74,22 @@ Probado con un proyecto real de Ableton Live: 11 archivos entre `Backup/`, `Samp
 ## Instalación
 
 ```sh
-pear install pear://ipuh57fdpuh5fxcc7533g67wttmxb8ajhobbykzd5z8cfdtcepwo
+pear install --timeout 300 pear://ipuh57fdpuh5fxcc7533g67wttmxb8ajhobbykzd5z8cfdtcepwo
 ```
 
 No hay descarga desde una web ni app store: el binario viaja por la misma red P2P. Las actualizaciones también — si publicamos una versión nueva, te llega sola.
+
+> **El `--timeout 300` no es opcional en la práctica.** El valor por defecto de `pear install` es 30 segundos, y entre descubrir un par y bajar el binario (55–94 MB según la plataforma) se agota. Si ves `Network Timeout 30s`, no es que no haya nadie sirviendo el proyecto: es que no llegó a tiempo. Con 300 segundos entra cómodo.
+
+### Si después de instalar `chakai` no se encuentra
+
+En Linux y macOS el binario queda en `~/.local/bin`. Si esa carpeta no está en tu `PATH`, la instalación funciona pero el comando no aparece:
+
+```sh
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Para dejarlo fijo, agregá esa línea a `~/.bashrc` o `~/.zshrc`.
 
 Para reinstalar sobre una versión existente hay que borrarla primero (`pear install` no pisa lo que ya está):
 
@@ -115,10 +127,11 @@ El código que se comparte es la clave pública del drive. El swarm se une a la 
 
 ## Plataformas compiladas
 
-- Linux x64
-- Windows x64
-- macOS Apple Silicon (arm64)
-- macOS Intel (x64)
+- Linux x64 y arm64
+- Windows x64 y arm64
+- macOS Apple Silicon (arm64) e Intel (x64)
+
+Cada instalación descarga únicamente el binario de su plataforma, no las seis.
 
 ### Cuándo se buscan actualizaciones
 
