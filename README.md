@@ -26,7 +26,7 @@ Abrís la sala con la carpeta del proyecto:
 chakai share ecos "Ecos de la Pacha/tema_principal Project"
 ```
 
-Eso comparte **y se queda vigilando**. Cada vez que guardás en el DAW, Chakai registra una *toma* nueva solo — no hay que acordarse de nada. Espera a que la escritura se calme antes de guardar, así una ráfaga de autoguardado no genera treinta versiones basura.
+Eso comparte **y se queda vigilando**. Cada vez que guardás en el DAW, Chakai registra una _toma_ nueva solo — no hay que acordarse de nada. Espera a que la escritura se calme antes de guardar, así una ráfaga de autoguardado no genera treinta versiones basura.
 
 Te imprime un código. Se lo pasás a la banda una sola vez, y no volvés a mandar archivos nunca más.
 
@@ -107,13 +107,13 @@ rm ~/.local/bin/chakai && pear install pear://ipuh57fdpuh5fxcc7533g67wttmxb8ajho
 
 Construido sobre el stack de Holepunch, partiendo del template oficial [`hello-pear-bare`](https://github.com/holepunchto/hello-pear-bare), **variante `main`** (el updater corre en un worker thread, que es lo indicado para un programa que queda abierto).
 
-| Pieza | Para qué |
-|---|---|
-| **Hyperdrive** | El sistema de archivos que se replica entre pares. Una sala = un drive. Su historial de versiones (`version`, `checkout`, `diff`) es lo que hace posible `log` y `restore`. |
-| **Corestore** | Guarda los datos del drive en disco. |
-| **Hyperswarm** | Encuentra a los otros músicos. Se une a la `discoveryKey`, que es un hash de la clave pública — así, alguien que mire la red no puede deducir el código de la sala. |
-| **Bare** | El runtime. Compila a un binario por sistema operativo, sin necesidad de instalar Node. |
-| **pear-runtime** | Las actualizaciones over-the-air, peer-to-peer. |
+| Pieza            | Para qué                                                                                                                                                                    |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Hyperdrive**   | El sistema de archivos que se replica entre pares. Una sala = un drive. Su historial de versiones (`version`, `checkout`, `diff`) es lo que hace posible `log` y `restore`. |
+| **Corestore**    | Guarda los datos del drive en disco.                                                                                                                                        |
+| **Hyperswarm**   | Encuentra a los otros músicos. Se une a la `discoveryKey`, que es un hash de la clave pública — así, alguien que mire la red no puede deducir el código de la sala.         |
+| **Bare**         | El runtime. Compila a un binario por sistema operativo, sin necesidad de instalar Node.                                                                                     |
+| **pear-runtime** | Las actualizaciones over-the-air, peer-to-peer.                                                                                                                             |
 
 El control de versiones no se construyó desde cero: Hypercore, que está debajo de Hyperdrive, es un registro de solo-agregado. Cada escritura deja la anterior intacta y accesible. Chakai expone eso en términos que un músico entiende.
 
@@ -161,13 +161,13 @@ Así nunca compiten por el lock. Sin esto, la segunda ventana abortaba con `Core
 
 ## Comandos
 
-| Comando | Qué hace |
-|---|---|
-| `chakai share <sala> <carpeta>` | Comparte el proyecto y vigila los cambios, registrando tomas |
-| `chakai join <codigo> [carpeta]` | Descarga el proyecto y queda sincronizando |
-| `chakai log <sala>` | Historial de tomas, con fecha y qué cambió |
-| `chakai restore <sala> <toma> [carpeta]` | Recupera el proyecto como estaba en esa toma |
-| `chakai` | Muestra la ayuda y busca actualizaciones |
+| Comando                                  | Qué hace                                                     |
+| ---------------------------------------- | ------------------------------------------------------------ |
+| `chakai share <sala> <carpeta>`          | Comparte el proyecto y vigila los cambios, registrando tomas |
+| `chakai join <codigo> [carpeta]`         | Descarga el proyecto y queda sincronizando                   |
+| `chakai log <sala>`                      | Historial de tomas, con fecha y qué cambió                   |
+| `chakai restore <sala> <toma> [carpeta]` | Recupera el proyecto como estaba en esa toma                 |
+| `chakai`                                 | Muestra la ayuda y busca actualizaciones                     |
 
 ## Desarrollo
 

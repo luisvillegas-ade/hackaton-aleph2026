@@ -27,17 +27,17 @@ npm run make:win32-x64                 # o una plataforma específica
 
 ## Arquitectura
 
-| Archivo | Responsabilidad |
-|---|---|
-| `bin.mjs` | Comandos y orquestación |
-| `lib/session.js` | Sesión multi-escritura: un drive por músico, intercambio de claves por protomux |
-| `lib/sync.js` | Resuelve la unión de todos los drives sobre la carpeta local |
-| `lib/rpp.js` | Fusión de proyectos Reaper por pista (GUID) |
-| `lib/room.js` | Replicación y archivos (modo `share`/`join`) |
-| `lib/watch.js` | Detección de cambios por sondeo, con espera de calma |
-| `lib/versions.js` | Historial de tomas |
-| `lib/ui.js`, `lib/tui.js` | Salida por terminal |
-| `workers/main.js` | Una línea: `require('hello-pear-worker')`, el updater OTA |
+| Archivo                   | Responsabilidad                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| `bin.mjs`                 | Comandos y orquestación                                                         |
+| `lib/session.js`          | Sesión multi-escritura: un drive por músico, intercambio de claves por protomux |
+| `lib/sync.js`             | Resuelve la unión de todos los drives sobre la carpeta local                    |
+| `lib/rpp.js`              | Fusión de proyectos Reaper por pista (GUID)                                     |
+| `lib/room.js`             | Replicación y archivos (modo `share`/`join`)                                    |
+| `lib/watch.js`            | Detección de cambios por sondeo, con espera de calma                            |
+| `lib/versions.js`         | Historial de tomas                                                              |
+| `lib/ui.js`, `lib/tui.js` | Salida por terminal                                                             |
+| `workers/main.js`         | Una línea: `require('hello-pear-worker')`, el updater OTA                       |
 
 ### Decisiones que conviene no revertir sin entender
 

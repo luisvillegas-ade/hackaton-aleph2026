@@ -200,7 +200,10 @@ try {
     const code = action.code || newSessionCode()
     const folder = action.folder.replace(/[/\\]+$/, '')
 
-    const slot = sessionCrypto.data(Buffer.from(code + '|' + folder)).toString('hex').slice(0, 16)
+    const slot = sessionCrypto
+      .data(Buffer.from(code + '|' + folder))
+      .toString('hex')
+      .slice(0, 16)
 
     const tuiLogs = []
     let tuiPeersCount = 1
@@ -209,7 +212,7 @@ try {
       if (tuiLogs.length > 8) tuiLogs.shift()
       renderActivity()
     }
-    
+
     function renderActivity() {
       tui.renderDashboard(
         `[ PEARS AUDIO SYNC ] | SESSION: OPEN | NODE: ONLINE (${tuiPeersCount} PEERS)`,
@@ -227,32 +230,39 @@ try {
           renderActivity()
           return
         }
-        
-        let allFiles = []
+
+        const allFiles = []
         for (const [hex, drive] of peers) {
           const files = await listFiles(drive)
-          files.forEach(f => {
+          files.forEach((f) => {
             allFiles.push({
-              label: `[Peer ${hex.slice(0,6)}] /${f.name}`,
+              label: `[Peer ${hex.slice(0, 6)}] /${f.name}`,
               value: { hex, name: f.name }
             })
           })
         }
-        
+
         if (allFiles.length === 0) {
-          tuiLogs.push(`[${new Date().toLocaleTimeString()}] WARNING: No files found in peer repositories.`)
+          tuiLogs.push(
+            `[${new Date().toLocaleTimeString()}] WARNING: No files found in peer repositories.`
+          )
           renderActivity()
           return
         }
-        
-        const selection = await tui.promptSelect('[ PEARS AUDIO SYNC ] | REPOSITORY EXPLORER', allFiles)
+
+        const selection = await tui.promptSelect(
+          '[ PEARS AUDIO SYNC ] | REPOSITORY EXPLORER',
+          allFiles
+        )
         if (selection) {
           const peerDrive = session.peers.get(selection.hex)
           const data = await peerDrive.get('/' + selection.name)
           const dest = path.join(folder, 'Samples', 'Imported', path.basename(selection.name))
           await fs.promises.mkdir(path.dirname(dest), { recursive: true })
           await fs.promises.writeFile(dest, data)
-          tuiLogs.push(`[${new Date().toLocaleTimeString()}] SUCCESS: Imported ${selection.name} to /Samples/`)
+          tuiLogs.push(
+            `[${new Date().toLocaleTimeString()}] SUCCESS: Imported ${selection.name} to /Samples/`
+          )
         }
         renderActivity()
       }
@@ -263,13 +273,15 @@ try {
       code,
       onPeer: (hex, total) => {
         tuiPeersCount = total
-        addLog(`[${new Date().toLocaleTimeString()}] INCOMING: Connection from [Node: ${hex.slice(0, 6)}]`)
+        addLog(
+          `[${new Date().toLocaleTimeString()}] INCOMING: Connection from [Node: ${hex.slice(0, 6)}]`
+        )
       }
     })
 
     const inicial = await scan(folder)
-    const subidos = await publishLocal(session.mine, folder, [...inicial.keys()])
-    
+    await publishLocal(session.mine, folder, [...inicial.keys()])
+
     tui.startGlobalListener()
     addLog(`[${new Date().toLocaleTimeString()}] SYSTEM: Session open. Project: ${folder}`)
     if (!action.code) {
@@ -281,21 +293,23 @@ try {
       onSnapshot: async ({ changed }) => {
         const pub = await publishLocal(session.mine, folder, changed)
         if (pub.length === 0) return
-        
+
         const details = []
         details.push(`PROJECT: ${folder}`)
         details.push(`PENDING CHANGES DETECTED:`)
-        pub.forEach(f => details.push(`> Modified/New: ${f.rel}`))
-        
+        pub.forEach((f) => details.push(`> Modified/New: ${f.rel}`))
+
         const confirm = await tui.promptConfirm(
           `[ PEARS AUDIO SYNC ] | SESSION: OPEN | NODE: ONLINE (${tuiPeersCount} PEERS)`,
           `Commit changes and broadcast to performers?`,
           details
         )
-        
+
         if (confirm) {
           const take = await appendTake(session.mine, { files: pub.map((f) => f.rel) })
-          addLog(`[${new Date().toLocaleTimeString()}] SUCCESS: Version ${take.n} synced to Pears node.`)
+          addLog(
+            `[${new Date().toLocaleTimeString()}] SUCCESS: Version ${take.n} synced to Pears node.`
+          )
         } else {
           addLog(`[${new Date().toLocaleTimeString()}] CANCELLED: Push aborted by Producer.`)
         }
@@ -324,10 +338,9 @@ try {
               }
             }
           })
-        } catch { }
+        } catch {}
       }
     }, 4000)
-
   } else if (action.type === 'share') {
     room = await openRoom({ storageDir: path.join(dir, 'rooms', action.room) })
 
@@ -441,7 +454,7 @@ try {
     const saved = await downloadAll(room.drive, action.target, (f) => {
       ui.printSuccess(`↓ ${f.name} (${humanSize(f.size)})`)
     })
-    
+
     if (saved.length === 0) {
       ui.printMuted('  (todavía no hay archivos, o nadie está compartiendo ahora)\n')
     } else {
