@@ -73,6 +73,12 @@ Probado con un proyecto real de Ableton Live: 11 archivos entre `Backup/`, `Samp
 
 ## Instalación
 
+> **Si estás en Windows, corré esto primero.** La consola de Windows no usa UTF-8 por defecto y la interfaz de Chakai se ve como caracteres rotos. Una sola línea lo arregla para esa sesión de terminal:
+>
+> ```sh
+> chcp 65001
+> ```
+
 ```sh
 pear install --timeout 300 pear://ipuh57fdpuh5fxcc7533g67wttmxb8ajhobbykzd5z8cfdtcepwo
 ```

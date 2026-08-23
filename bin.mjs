@@ -212,7 +212,7 @@ try {
     
     function renderActivity() {
       tui.renderDashboard(
-        `[ PEARS AUDIO SYNC ] | ROLE: PRODUCER | NODE: ONLINE (${tuiPeersCount} PEERS)`,
+        `[ PEARS AUDIO SYNC ] | SESSION: OPEN | NODE: ONLINE (${tuiPeersCount} PEERS)`,
         tuiLogs.join('\n'),
         ['[R] Refresh Log', '[B] Browse Performer Repositories', '[Ctrl+C] Exit']
       )
@@ -288,7 +288,7 @@ try {
         pub.forEach(f => details.push(`> Modified/New: ${f.rel}`))
         
         const confirm = await tui.promptConfirm(
-          `[ PEARS AUDIO SYNC ] | ROLE: PRODUCER | NODE: ONLINE (${tuiPeersCount} PEERS)`,
+          `[ PEARS AUDIO SYNC ] | SESSION: OPEN | NODE: ONLINE (${tuiPeersCount} PEERS)`,
           `Commit changes and broadcast to performers?`,
           details
         )
